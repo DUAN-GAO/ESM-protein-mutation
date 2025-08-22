@@ -21,8 +21,8 @@ By computing the conditional probabilities of wild-type and mutant amino acids u
 
 ## Core Algorithm
 
-Given a protein sequence \( S = (s_1, s_2, \ldots, s_n) \) and a mutation at position \( i \),  
-where the wild-type amino acid is \( a_{\text{wt}} \) and the mutant is \( a_{\text{mut}} \).  
+Given a protein sequence $S = (s_1, s_2, \ldots, s_n)$ and a mutation at position $i$,  
+where the wild-type amino acid is $a_{\text{wt}}$ and the mutant is $a_{\text{mut}}$.  
 
 The ESM model computes the conditional probability of an amino acid at position \( i \) given the masked sequence context:
 
