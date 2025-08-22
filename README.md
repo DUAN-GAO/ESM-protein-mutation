@@ -17,7 +17,6 @@ By computing the conditional probabilities of wild-type and mutant amino acids u
 - Protein engineering and drug design  
 - Bioinformatics and computational biology research  
 
-## Core Algorithm
 
 ## Core Algorithm
 
@@ -39,7 +38,6 @@ $\Delta = \log \frac{p_{\text{mut}}}{p_{\text{wt}}}$
 - If $\Delta < 0$: the mutation is less probable than the wild type → potentially harmful.  
 - If $\Delta > 0$: the mutation is more probable than the wild type → likely tolerated.  
   
-
 
 ## 2. Usage
 Clone this repo and run following command:
