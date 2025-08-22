@@ -1,8 +1,53 @@
-# Machine Learning-Driven Data Fusion in Cancer Research: A Review of Methodologies and Trends
+# ESM-PROTEIN-MUTATION: Protein Mutation Harmfulness Assessment Based on ESM
 -----------------------------------------------------------------
 
 ## 1. Introduction
-**ESM-PROTEIN-MUTATION** 
+**ESM-PROTEIN-MUTATION** is a tool built on top of [ESM (Evolutionary Scale Modeling)](https://github.com/facebookresearch/esm) for evaluating the potential harmfulness of amino acid mutations in proteins.  
+By computing the conditional probabilities of wild-type and mutant amino acids under the ESM language model, this tool provides a quantitative score (Δscore) that reflects the functional impact of mutations. This makes it useful for function prediction, pathogenicity assessment, and biomedical research.
+
+## Features
+- Input a protein sequence and specify a mutation (position, wild-type residue, mutant residue)  
+- Utilize the pre-trained ESM-1b model to compute amino acid probabilities  
+- Output the **Δscore** (log-likelihood ratio) as a quantitative indicator of mutation harmfulness  
+- Support for both direct sequence input and FASTA file input  
+
+## Use Cases
+- Protein function analysis  
+- Pathogenic mutation prediction  
+- Protein engineering and drug design  
+- Bioinformatics and computational biology research  
+
+## Core Algorithm
+
+Given:
+- A protein sequence \( S = (s_1, s_2, \ldots, s_n) \)  
+- A mutation at position \( i \) (wild-type amino acid \( a_{\text{wt}} \) replaced by mutant \( a_{\text{mut}} \))  
+
+The ESM model computes the conditional probability of an amino acid at position \( i \) given the sequence context:
+
+\[
+P(a \mid S_{\setminus i})
+\]
+
+where \( S_{\setminus i} \) denotes the sequence with the amino acid at position \( i \) masked out.  
+
+The wild-type and mutant probabilities are:
+
+\[
+p_{\text{wt}} = P(a_{\text{wt}} \mid S_{\setminus i}), 
+\quad
+p_{\text{mut}} = P(a_{\text{mut}} \mid S_{\setminus i})
+\]
+
+The mutation score (Δscore) is defined as the **log-likelihood ratio**:
+
+\[
+\Delta = \log \frac{p_{\text{mut}}}{p_{\text{wt}}}
+\]
+
+- If \(\Delta < 0\), the mutation is less probable than the wild-type and may be harmful.  
+- If \(\Delta > 0\), the mutation is more probable than the wild-type and may be tolerated.  
+
 
 ## 2. Usage
 Clone this repo and run following command:
@@ -10,10 +55,16 @@ Clone this repo and run following command:
 ```docker run --rm --gpus all \
     -v $(pwd):/workspace \
     -w /workspace \
-    biochunan/esmfold-image \
+    biochunan/esmfold-image:latest \
     python main.py --seq protein.fasta --pos 248 --wt Q --mut R
 ```
+### Example output
 
+```
+Wild-type amino acid Q probability: 0.012345
+Mutant amino acid R probability: 0.001234
+Δscore (log likelihood ratio): -2.4021
+```
 ## 3. Contact  
 
 **DUAN GAO** < gaoduan666@gmail.com >  
