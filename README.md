@@ -19,44 +19,37 @@ By computing the conditional probabilities of wild-type and mutant amino acids u
 
 ## Core Algorithm
 
-Given:
-- A protein sequence \( S = (s_1, s_2, \ldots, s_n) \)  
-- A mutation at position \( i \) (wild-type amino acid \( a_{\text{wt}} \) replaced by mutant \( a_{\text{mut}} \))  
+## Core Algorithm
 
-The ESM model computes the conditional probability of an amino acid at position \( i \) given the sequence context:
+Given a protein sequence \( S = (s_1, s_2, \ldots, s_n) \) and a mutation at position \( i \),  
+where the wild-type amino acid is \( a_{\text{wt}} \) and the mutant is \( a_{\text{mut}} \).  
 
-\[
-P(a \mid S_{\setminus i})
-\]
+The ESM model computes the conditional probability of an amino acid at position \( i \) given the masked sequence context:
 
-where \( S_{\setminus i} \) denotes the sequence with the amino acid at position \( i \) masked out.  
+$P(a \mid S_{\setminus i})$
 
-The wild-type and mutant probabilities are:
+Wild-type and mutant probabilities are:
 
-\[
-p_{\text{wt}} = P(a_{\text{wt}} \mid S_{\setminus i}), 
-\quad
-p_{\text{mut}} = P(a_{\text{mut}} \mid S_{\setminus i})
-\]
+$p_{\text{wt}} = P(a_{\text{wt}} \mid S_{\setminus i}), \quad p_{\text{mut}} = P(a_{\text{mut}} \mid S_{\setminus i})$
 
-The mutation score (Δscore) is defined as the **log-likelihood ratio**:
+The mutation score (Δscore) is defined as the log-likelihood ratio:
 
-\[
-\Delta = \log \frac{p_{\text{mut}}}{p_{\text{wt}}}
-\]
+$\Delta = \log \frac{p_{\text{mut}}}{p_{\text{wt}}}$
 
-- If \(\Delta < 0\), the mutation is less probable than the wild-type and may be harmful.  
-- If \(\Delta > 0\), the mutation is more probable than the wild-type and may be tolerated.  
+- If $\Delta < 0$: the mutation is less probable than the wild type → potentially harmful.  
+- If $\Delta > 0$: the mutation is more probable than the wild type → likely tolerated.  
+  
 
 
 ## 2. Usage
 Clone this repo and run following command:
 
-```docker run --rm --gpus all \
+```
+docker run --rm --gpus all \
     -v $(pwd):/workspace \
     -w /workspace \
     biochunan/esmfold-image:latest \
-    python main.py --seq protein.fasta --pos 248 --wt Q --mut R
+python main.py --seq protein.fasta --pos 248 --wt Q --mut R
 ```
 ### Example output
 
