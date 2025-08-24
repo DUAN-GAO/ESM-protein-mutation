@@ -1,6 +1,7 @@
 import torch
 import argparse
 from esm import pretrained
+import time
 
 
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
@@ -62,9 +63,12 @@ if __name__ == "__main__":
         with open(sequence, "r") as f:
             lines = f.readlines()
             sequence = "".join([l.strip() for l in lines if not l.startswith(">")])
+    start_time = time.time()
 
     delta, p_wt, p_mut = compute_delta_score(sequence, args.pos, args.wt, args.mut)
-
-    print(f"野生型氨基酸 {args.wt} 的概率: {p_wt:.6f}")
-    print(f"突变型氨基酸 {args.mut} 的概率: {p_mut:.6f}")
+    
+    end_time = time.time()
+    print(f"Elapsed time: {end_time - start_time:.2f} seconds")
+    print(f"Wild type amino acid {args.wt} likelihood: {p_wt:.6f}")
+    print(f"Mutant type amino acid {args.mut} likelihood: {p_mut:.6f}")
     print(f"Δscore (log likelihood ratio): {delta:.4f}")
