@@ -43,18 +43,16 @@ $\Delta = \log \frac{p_{\text{mut}}}{p_{\text{wt}}}$
 Clone this repo and run following command:
 
 ```
-docker run --rm --gpus all \
-    -v $(pwd):/workspace \
-    -w /workspace \
-    biochunan/esmfold-image:latest \
-python main.py --seq protein.fasta --pos 248 --wt Q --mut R
+docker run --rm --gpus all -v %cd%:/workspace -w /workspace duangao/esm-protein-mutation:latest python main.py --seq MLLRSSGKLSVGTKKEDGESTAPTPRPKILRCKCHHHCPEDSVNNICSTDGYCFTMIEEDDSGMPVVTSGCLGLEGSDFQCRDTPIPHQRRSIECCTERNECNKDLHPTLPPLKNRDFVDGPIHHKALLISVTVCSLLLVLIILFCYFRYKRQEARPRYSIGLEQDETYIPPGESLRDLIEQSQSSGSGSGLPLLVQRTIAKQIQMVKQIGKGRYGEVWMGKWRGEKVAVKVFFTTEEASWFRETEIYQTVLMRHENILGFIAADIKGTGSWTQLYLITDYHENGSLYDYLKSTTLDTKSMLKLAYSAVSGLCHLHTEIFSTQGKPAIAHRDLKSKNILVKKNGTCCIADLGLAVKFISDTNEVDIPPNTRVGTKRYMPPEVLDESLNRNHFQSYIMADMYSFGLILWEVARRCVSGGIVEEYQLPYHDLVPSDPSYEDMREIVCIKKLRPSFPNRWSSDECLRQMGKLMTECWAHNPASRLTALRVKKTLAKMSESQDIKL --pos 248 --wt Q --mut R
 ```
+Change the -v hyperparameters from % to $ if you run in a linux command line.
 ### Example output
 
 ```
-Wild-type amino acid Q probability: 0.012345
-Mutant amino acid R probability: 0.001234
-Δscore (log likelihood ratio): -2.4021
+Elapsed time: 51.85 seconds
+Wild type amino acid Q likelihood: 0.048806
+Mutant type amino acid R likelihood: 0.000183
+Δscore (log likelihood ratio): -5.5867
 ```
 
 ## 3. Code interpretation  
