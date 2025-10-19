@@ -54,6 +54,12 @@ Wild type amino acid Q likelihood: 0.048806
 Mutant type amino acid R likelihood: 0.000183
 Δscore (log likelihood ratio): -5.5867
 ```
+### PDB making
+```
+python make_pdb.py
+```
+use docker file:
+duangao/esm-protein-mutation:v1
 
 ## 3. Code block interpretation  
 
