@@ -58,7 +58,8 @@ Mutant type amino acid R likelihood: 0.000183
 ```
 python make_pdb.py
 ```
-use docker file:
+To optimize, uncomment chunk size code block.
+Use docker file:
 duangao/esm-protein-mutation:v1
 
 ## 3. Code block interpretation  
