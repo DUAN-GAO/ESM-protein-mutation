@@ -70,17 +70,21 @@ def main():
     print(f"📂 Output folder: {jobname}")
 
     # Default settings
-    model_path = "esmfold_model.pt"  # default model path
+    model_path = "esmfold.model"  # default model path
     num_recycles = 3
     chain_linker = 25
 
     # Load model
     print("📦 Loading ESMFold model...")
-    model = torch.load(model_path, weights_only=False)
+    model = torch.load(model_path) #, weights_only=False deleted
     model.eval().cuda().requires_grad_(False)
 
     # Optimize chunk size
-    model.set_chunk_size(64 if len(sequence) > 700 else 128)
+    # model.set_chunk_size(64 if len(sequence) > 700 else 128) 
+    torch.cuda.empty_cache()
+    model.eval().cuda().requires_grad_(False)
+    model.set_chunk_size(16)   # 原来 64/128
+    num_recycles = 1 
 
     torch.cuda.empty_cache()
     print("🚀 Running inference...")
