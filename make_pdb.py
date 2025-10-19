@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Minimal ESMFold inference script
+Minimal ESMFold inference script (no JAX dependency)
 Usage:
   python make_pdb.py --sequence "GWSTELEKHREELKEFLKKEGITNVEIRIDNGRLEVRVEGGTERLKRFLEELRQKLEKKGYTVDIKIE"
 """
@@ -14,7 +14,6 @@ import gc
 import hashlib
 import numpy as np
 import torch
-from jax.tree_util import tree_map
 from scipy.special import softmax
 
 
@@ -38,6 +37,19 @@ def parse_output(output):
         "sm_contacts": sm_contacts[mask, :][:, mask],
         "xyz": xyz[mask],
     }
+
+
+def recursive_to_numpy(obj):
+    """Recursively convert torch tensors to numpy arrays"""
+    if torch.is_tensor(obj):
+        return obj.cpu().numpy()
+    elif isinstance(obj, dict):
+        return {k: recursive_to_numpy(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        cls = type(obj)
+        return cls(recursive_to_numpy(v) for v in obj)
+    else:
+        return obj
 
 
 def main():
@@ -81,7 +93,8 @@ def main():
     )
 
     pdb_str = model.output_to_pdb(output)[0]
-    output = tree_map(lambda x: x.cpu().numpy(), output)
+    # Convert all torch tensors in output to numpy
+    output = recursive_to_numpy(output)
 
     ptm = output["ptm"][0]
     plddt = output["plddt"][0, ..., 1].mean()
