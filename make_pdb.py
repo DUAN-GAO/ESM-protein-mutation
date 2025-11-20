@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Minimal ESMFold inference script
+Minimal ESMFold inference script (no JAX dependency)
 Usage:
   python make_pdb.py --sequence "GWSTELEKHREELKEFLKKEGITNVEIRIDNGRLEVRVEGGTERLKRFLEELRQKLEKKGYTVDIKIE"
 """
@@ -14,7 +14,6 @@ import gc
 import hashlib
 import numpy as np
 import torch
-from jax.tree_util import tree_map
 from scipy.special import softmax
 
 
@@ -40,6 +39,19 @@ def parse_output(output):
     }
 
 
+def recursive_to_numpy(obj):
+    """Recursively convert torch tensors to numpy arrays"""
+    if torch.is_tensor(obj):
+        return obj.cpu().numpy()
+    elif isinstance(obj, dict):
+        return {k: recursive_to_numpy(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        cls = type(obj)
+        return cls(recursive_to_numpy(v) for v in obj)
+    else:
+        return obj
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run ESMFold protein structure prediction")
     parser.add_argument("--sequence", type=str, required=True, help="Protein sequence (A-Z)")
@@ -58,17 +70,21 @@ def main():
     print(f"📂 Output folder: {jobname}")
 
     # Default settings
-    model_path = "esmfold_model.pt"  # default model path
+    model_path = "esmfold.model"  # default model path
     num_recycles = 3
     chain_linker = 25
 
     # Load model
     print("📦 Loading ESMFold model...")
-    model = torch.load(model_path, weights_only=False)
+    model = torch.load(model_path) #, weights_only=False deleted
     model.eval().cuda().requires_grad_(False)
 
     # Optimize chunk size
-    model.set_chunk_size(64 if len(sequence) > 700 else 128)
+    # model.set_chunk_size(64 if len(sequence) > 700 else 128) 
+    torch.cuda.empty_cache()
+    model.eval().cuda().requires_grad_(False)
+    model.set_chunk_size(16)   # 原来 64/128
+    num_recycles = 1 
 
     torch.cuda.empty_cache()
     print("🚀 Running inference...")
@@ -81,7 +97,8 @@ def main():
     )
 
     pdb_str = model.output_to_pdb(output)[0]
-    output = tree_map(lambda x: x.cpu().numpy(), output)
+    # Convert all torch tensors in output to numpy
+    output = recursive_to_numpy(output)
 
     ptm = output["ptm"][0]
     plddt = output["plddt"][0, ..., 1].mean()
