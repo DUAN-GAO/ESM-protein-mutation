@@ -4,7 +4,7 @@ from collections import defaultdict
 import torch
 from esm import pretrained
 
-# ---------------- User's compute_delta_score ----------------
+# ---------------- User's compute_delta_score (UNCHANGED) ----------------
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
     print(f"[DEBUG] Running compute_delta_score: aa_pos={mutation_position}, wt={wildtype_aa}, mut={mutant_aa}, seq_len={len(wildtype_sequence)}")
 
@@ -63,14 +63,24 @@ def chunked(iterable, n):
     for i in range(0, len(it), n):
         yield it[i:i+n]
 
-# ---------------- VEP annotation ----------------
+def _normalize_chrom(chrom):
+    """Remove leading 'chr' or 'CHR' if present, as Ensembl expects '1' not 'chr1'."""
+    if chrom.lower().startswith("chr"):
+        return chrom[3:]
+    return chrom
+
+# ---------------- VEP annotation (fixed variant string format) ----------------
 def annotate_with_vep(variants, batch_size=50, pause=0.2):
     out = []
     url = ENSEMBL_GRCH37 + VEP_ENDPOINT
 
     for chunk in chunked(variants, batch_size):
-        var_strs = [f"{v['chrom']}:{v['pos']}:{v['ref']}/{v['alt']}" for v in chunk]
-        print(f"[DEBUG] Sending VEP request: {var_strs}")
+        # NOTE: use "chrom pos ref/alt" format (space-separated) and normalize chrom by removing "chr"
+        var_strs = []
+        for v in chunk:
+            chrom_clean = _normalize_chrom(v['chrom'])
+            var_strs.append(f"{chrom_clean} {v['pos']} {v['ref']}/{v['alt']}")
+        print(f"[DEBUG] Sending VEP request (GRCh37) with variants: {var_strs}")
 
         payload = {"variants": var_strs}
 
@@ -79,18 +89,23 @@ def annotate_with_vep(variants, batch_size=50, pause=0.2):
             print(f"[DEBUG] VEP status: {r.status_code}")
             if r.status_code == 200:
                 res = r.json()
+                # expected: list aligned to var_strs
                 for v, rj in zip(chunk, res):
                     out.append({"input": v, "vep": rj})
             else:
-                print("[DEBUG] VEP ERROR: non-200 status")
+                # Print server response body to help debug (VEP returns JSON explaining the 400)
+                text = ""
+                try:
+                    text = r.text
+                except Exception:
+                    text = "<no response body>"
+                print(f"[DEBUG] VEP non-200 response text: {text}", file=sys.stderr)
                 for v in chunk:
-                    out.append({"input": v, "vep": None})
-
+                    out.append({"input": v, "vep": None, "vep_error": f"status_{r.status_code}", "vep_text": text})
         except Exception as e:
-            print(f"[DEBUG] VEP request FAILED: {e}")
+            print(f"[DEBUG] VEP request FAILED: {e}", file=sys.stderr)
             for v in chunk:
-                out.append({"input": v, "vep": None})
-
+                out.append({"input": v, "vep": None, "vep_error": str(e)})
         time.sleep(pause)
 
     return out
@@ -107,7 +122,7 @@ def pick_transcript_consequence(vep_entry):
         if tc.get("protein_id"):
             print("[DEBUG] non-canonical transcript with protein selected")
             return tc
-    return tcs[0]
+    return tcs[0] if tcs else None
 
 def fetch_protein_seq(ensp_id):
     print(f"[DEBUG] Fetching protein seq: {ensp_id}")
@@ -122,7 +137,7 @@ def fetch_protein_seq(ensp_id):
             print(f"[DEBUG] Protein length: {len(seq)}")
             return seq
     except Exception as e:
-        print(f"[DEBUG] FASTA fetch failed: {e}")
+        print(f"[DEBUG] FASTA fetch failed: {e}", file=sys.stderr)
         return None
 
 def three_to_one(aa):
@@ -142,7 +157,7 @@ def parse_hgvsp(hgvsp):
     import re
     m = re.match(r"([A-Za-z]{1,3}|[A-Za-z])(\d+)([A-Za-z]{1,3}|[A-Za-z])", p)
     if not m:
-        print("[DEBUG] Could not parse HGVS p.")
+        print("[DEBUG] Could not parse HGVS p.", file=sys.stderr)
         return None
 
     ref, pos, alt = m.group(1), int(m.group(2)), m.group(3)
@@ -167,16 +182,20 @@ def main():
     for item in annotated:
         vin = item["input"]
         vep = item.get("vep")
+        vep_error = item.get("vep_error")
+        vep_text = item.get("vep_text")
 
         print(f"\n[DEBUG] Processing variant: {vin}")
 
         row = {"chrom": vin["chrom"], "pos": vin["pos"], "ref": vin["ref"], "alt": vin["alt"],
                "gene": None, "transcript": None, "protein": None,
                "aa_pos": None, "wt_aa": None, "mut_aa": None,
-               "delta_score": None, "p_wt": None, "p_mut": None}
+               "delta_score": None, "p_wt": None, "p_mut": None, "vep_error": vep_error or ""}
 
         if not vep:
-            print("[DEBUG] No VEP annotation")
+            print("[DEBUG] No VEP annotation (see vep_error)", file=sys.stderr)
+            if vep_text:
+                print(f"[DEBUG] VEP text: {vep_text}", file=sys.stderr)
             output_rows.append(row)
             continue
 
@@ -207,7 +226,13 @@ def main():
 
         print(f"[DEBUG] Calling compute_delta_score: pos={aa_pos}, wt={wt}, mut={mut}")
 
-        delta_score, p_wt, p_mut = compute_delta_score(seq, aa_pos, wt, mut)
+        try:
+            delta_score, p_wt, p_mut = compute_delta_score(seq, aa_pos, wt, mut)
+        except Exception as e:
+            print(f"[DEBUG] compute_delta_score raised exception: {e}", file=sys.stderr)
+            row["vep_error"] = f"compute_error:{e}"
+            output_rows.append(row)
+            continue
 
         row.update({"gene": gene_symbol, "transcript": transcript_id, "protein": protein_id,
                     "aa_pos": aa_pos, "wt_aa": wt, "mut_aa": mut,
@@ -217,9 +242,9 @@ def main():
 
     with open(args.out, "w", newline="") as fh:
         w = csv.writer(fh, delimiter="\t")
-        w.writerow(["chrom","pos","ref","alt","gene","transcript","protein","aa_pos","wt_aa","mut_aa","delta_score","p_wt","p_mut"])
+        w.writerow(["chrom","pos","ref","alt","gene","transcript","protein","aa_pos","wt_aa","mut_aa","delta_score","p_wt","p_mut","vep_error"])
         for r in output_rows:
-            w.writerow([r.get(c,"") for c in ["chrom","pos","ref","alt","gene","transcript","protein","aa_pos","wt_aa","mut_aa","delta_score","p_wt","p_mut"]])
+            w.writerow([r.get(c,"") for c in ["chrom","pos","ref","alt","gene","transcript","protein","aa_pos","wt_aa","mut_aa","delta_score","p_wt","p_mut","vep_error"]])
 
     print(f"[DEBUG] Done. Output written to {args.out}")
 
