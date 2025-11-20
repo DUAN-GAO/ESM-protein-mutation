@@ -7,8 +7,9 @@ import torch
 import json
 import gzip
 
-# ---------------- User's compute_delta_score (UNCHANGED) ----------------
+# ---------------- User's compute_delta_score ----------------
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
+    print(f"[DEBUG] compute_delta_score: pos={mutation_position}, wt={wildtype_aa}, mut={mutant_aa}, seq_len={len(wildtype_sequence)}")
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
@@ -28,6 +29,7 @@ def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutan
     p_mutant = probabilities[mut_idx].item()
     epsilon = 1e-10
     delta_score = torch.log(torch.tensor(p_mutant + epsilon) / torch.tensor(p_wild + epsilon)).item()
+    print(f"[DEBUG] delta_score={delta_score}, p_wt={p_wild}, p_mut={p_mutant}")
     return delta_score, p_wild, p_mutant
 
 # ---------------- Utility: Normalize chromosome ----------------
@@ -79,16 +81,18 @@ def annotate_with_vep(variant_list, assembly="grch37", chunk_size=200):
                 r = requests.post(endpoint, headers=headers, data=json.dumps(payload))
                 if r.status_code == 200:
                     break
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DEBUG] VEP request exception: {e}", file=sys.stderr)
             time.sleep(1)
         if r.status_code != 200:
+            print(f"[DEBUG] VEP non-200 response: {r.status_code}", file=sys.stderr)
             for v in chunk:
                 results.append({**v, "vep": None})
             continue
         try:
             data = r.json()
         except Exception:
+            print("[DEBUG] VEP returned non-JSON", file=sys.stderr)
             for v in chunk:
                 results.append({**v, "vep": None})
             continue
@@ -125,7 +129,8 @@ def fetch_protein_seq(ensp_id):
             lines = r.text.strip().splitlines()
             seq = "".join([l.strip() for l in lines if not l.startswith(">")])
             return seq
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] fetch_protein_seq failed: {e}", file=sys.stderr)
         return None
     return None
 
@@ -137,16 +142,23 @@ def main():
     parser.add_argument("--assembly", default="grch37", choices=["grch37","grch38"])
     args = parser.parse_args()
 
+    print(f"[DEBUG] Loading VCF {args.vcf}...")
     variants = load_vcf(args.vcf)
+    print(f"[DEBUG] {len(variants)} variants loaded")
+
+    print("[DEBUG] Querying VEP...")
     annotated = annotate_with_vep(variants, assembly=args.assembly)
+    print(f"[DEBUG] VEP annotation done, {len(annotated)} records")
 
     with open(args.out, "w", newline="") as fh:
         w = csv.writer(fh, delimiter="\t")
         w.writerow(["chrom","pos","ref","alt","delta_score"])
         for v in annotated:
-            vep = v.get("vep")
             delta_score = None
-            if vep:
+            vep = v.get("vep")
+            if not vep:
+                print(f"[DEBUG] No VEP for {v['chrom']}:{v['pos']}", file=sys.stderr)
+            else:
                 tc_list = vep.get("transcript_consequences") or []
                 tc = None
                 for t in tc_list:
@@ -155,19 +167,27 @@ def main():
                         break
                 if not tc and tc_list:
                     tc = tc_list[0]
-                if tc and tc.get("protein_id"):
+                if not tc:
+                    print(f"[DEBUG] No transcript consequence for {v['chrom']}:{v['pos']}", file=sys.stderr)
+                else:
                     hgvsp = tc.get("hgvsp")
                     parsed = parse_hgvsp(hgvsp)
-                    protein_id = tc.get("protein_id") if tc else None
-                    seq = fetch_protein_seq(protein_id) if protein_id else None
-                    if seq and parsed:
-                        aa_pos = parsed["pos"] - 1
-                        wt = parsed["ref"]
-                        mut = parsed["alt"]
-                        try:
-                            delta_score, _, _ = compute_delta_score(seq, aa_pos, wt, mut)
-                        except Exception:
-                            delta_score = None
+                    if not parsed:
+                        print(f"[DEBUG] Failed to parse HGVS {hgvsp}", file=sys.stderr)
+                    else:
+                        protein_id = tc.get("protein_id")
+                        seq = fetch_protein_seq(protein_id)
+                        if not seq:
+                            print(f"[DEBUG] Failed to fetch protein {protein_id}", file=sys.stderr)
+                        else:
+                            aa_pos = parsed["pos"] - 1
+                            wt = parsed["ref"]
+                            mut = parsed["alt"]
+                            try:
+                                delta_score, _, _ = compute_delta_score(seq, aa_pos, wt, mut)
+                            except Exception as e:
+                                print(f"[DEBUG] compute_delta_score exception: {e}", file=sys.stderr)
+                                delta_score = None
             w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], delta_score])
 
 if __name__ == "__main__":
