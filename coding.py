@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse, csv, time, requests, sys
+import argparse, csv, time, requests, sys, re
 from esm import pretrained
 import torch
 import gzip
-import re
 
 # ---------------- compute_delta_score ----------------
 def compute_delta_score(seq, aa_pos, wt, mut):
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
+
     masked_seq = list(seq)
     masked_seq[aa_pos] = alphabet.get_tok(alphabet.mask_idx)
     masked_seq_str = "".join(masked_seq)
@@ -26,6 +26,7 @@ def compute_delta_score(seq, aa_pos, wt, mut):
     probs = torch.softmax(mask_logits, dim=0)
     p_wt = probs[alphabet.get_idx(wt)].item()
     p_mut = probs[alphabet.get_idx(mut)].item()
+
     epsilon = 1e-10
     delta_score = torch.log(torch.tensor(p_mut + epsilon) / torch.tensor(p_wt + epsilon)).item()
     return delta_score
@@ -97,8 +98,8 @@ def three_to_one(aa):
              'Thr':'T','Trp':'W','Tyr':'Y','Val':'V','Sec':'U','Pyl':'O'}
     if aa is None: return None
     aa = str(aa)
-    if len(aa) == 1: return aa
-    return table.get(aa, aa[0] if len(aa) > 0 else None)
+    if len(aa)==1: return aa
+    return table.get(aa, aa[0] if len(aa)>0 else None)
 
 def parse_hgvsp(hgvsp):
     if not hgvsp: return None
@@ -111,17 +112,24 @@ def parse_hgvsp(hgvsp):
     return {"ref": three_to_one(ref), "pos": pos, "alt": three_to_one(alt) if alt!="*" else "*"}
 
 # ---------------- fetch protein sequence ----------------
-def fetch_protein_seq(ensp_id):
-    url = f"https://rest.ensembl.org/sequence/id/{ensp_id}"
+def fetch_protein_seq(protein_id):
+    if not protein_id:
+        return None
+    if protein_id.startswith("ENSP"):
+        url = f"https://rest.ensembl.org/sequence/id/{protein_id}?type=protein"
+        headers = {"Accept": "text/x-fasta"}
+    else:  # RefSeq NP_*
+        url = f"https://www.ncbi.nlm.nih.gov/protein/{protein_id}?report=fasta&format=text"
+        headers = {"Accept": "text/plain"}
     try:
-        r = requests.get(url, headers={"Accept": "text/x-fasta"}, params={"type":"protein"}, timeout=20)
+        r = requests.get(url, headers=headers, timeout=20)
         if r.status_code == 200:
             lines = r.text.strip().splitlines()
             return "".join([l.strip() for l in lines if not l.startswith(">")])
         else:
-            print(f"[DEBUG] Protein fetch failed for {ensp_id} {r.status_code}", file=sys.stderr)
+            print(f"[DEBUG] Protein fetch failed for {protein_id} {r.status_code}", file=sys.stderr)
     except Exception as e:
-        print(f"[DEBUG] Protein fetch failed for {ensp_id}: {e}", file=sys.stderr)
+        print(f"[DEBUG] Protein fetch failed for {protein_id}: {e}", file=sys.stderr)
     return None
 
 # ---------------- Main ----------------
@@ -151,51 +159,51 @@ def main():
             protein_tcs = [t for t in tc_list if t.get("biotype")=="protein_coding" or t.get("gene_biotype")=="protein_coding"]
 
             tc = None
-            # prioritize canonical with ENSP and hgvsp
             for t in protein_tcs:
-                if t.get("canonical")==1 and t.get("ensembl_peptide_id") and t.get("hgvsp"):
-                    tc = t; break
+                if t.get("canonical")==1 and (t.get("ensembl_peptide_id") or t.get("protein_id")) and t.get("hgvsp"):
+                    tc = t
+                    break
             if not tc:
                 for t in protein_tcs:
-                    if t.get("ensembl_peptide_id") and t.get("hgvsp"):
-                        tc = t; break
+                    if (t.get("ensembl_peptide_id") or t.get("protein_id")) and t.get("hgvsp"):
+                        tc = t
+                        break
             if not tc and protein_tcs:
                 tc = protein_tcs[0]
 
             if not tc:
+                print(f"[INFO] No protein coding transcript with sequence for {v['chrom']}:{v['pos']}", file=sys.stderr)
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
-            protein_id = tc.get("ensembl_peptide_id")
-            if not protein_id:
-                print(f"[INFO] No ENSP peptide ID for {v['chrom']}:{v['pos']}")
-                w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
-                continue
-
+            protein_id = tc.get("ensembl_peptide_id") or tc.get("protein_id")
             parsed = parse_hgvsp(tc.get("hgvsp")) if tc.get("hgvsp") else None
             if not parsed and tc.get("amino_acids") and tc.get("protein_start"):
                 aa = tc["amino_acids"].split("/")
-                if len(aa) == 2:
+                if len(aa)==2:
                     parsed = {"ref": three_to_one(aa[0]), "pos": int(tc["protein_start"]), "alt": three_to_one(aa[1])}
 
             if not parsed:
+                print(f"[INFO] Cannot parse amino acid change for {protein_id}", file=sys.stderr)
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
             seq = fetch_protein_seq(protein_id)
             if not seq:
+                print(f"[INFO] Cannot fetch protein sequence for {protein_id}", file=sys.stderr)
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
             aa_pos = parsed["pos"] - 1
             if aa_pos < 0 or aa_pos >= len(seq):
+                print(f"[INFO] Amino acid position {aa_pos} out of range for {protein_id}", file=sys.stderr)
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
             try:
                 delta = compute_delta_score(seq, aa_pos, parsed["ref"], parsed["alt"])
             except Exception as e:
-                print(f"[DEBUG] delta_score failed: {e}", file=sys.stderr)
+                print(f"[DEBUG] delta_score failed for {protein_id}: {e}", file=sys.stderr)
                 delta = None
 
             w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], delta])
