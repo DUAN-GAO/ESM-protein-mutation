@@ -1,71 +1,58 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import argparse
-import subprocess
-import gzip
 import csv
+from main import score_single_variant
 
-def extract_rsids_from_vcf(vcf_path):
-    """从 VCF 文件中提取 rsID"""
-    opener = gzip.open if vcf_path.endswith(".gz") else open
-    rsids = []
-    with opener(vcf_path, "rt") as f:
+
+def parse_vcf_and_score(vcf_path, out_csv):
+    rows = []
+
+    with open(vcf_path) as f:
         for line in f:
             if line.startswith("#"):
                 continue
+
             fields = line.strip().split("\t")
-            info = fields[7] if len(fields) > 7 else ""
-            if "CSQ=" in info:
-                csq_entries = info.split("CSQ=")[1].split(",")
-                for entry in csq_entries:
-                    cols = entry.split("|")
-                    for col in cols:
-                        col = col.strip()
-                        if col.startswith("rs") and col[2:].isdigit():
-                            rsids.append(col)
-    return list(set(rsids))  # 去重
+            chrom, pos, _, ref, alt = fields[:5]
 
-def main(vcf_path, output_csv):
-    rsids = extract_rsids_from_vcf(vcf_path)
-    print(f"[INFO] 共找到 {len(rsids)} 个 rsID")
+            info = fields[7]
+            rsid = None
 
-    results = []
-    for rsid in rsids:
-        print(f"[RUN] 处理 {rsid} ...")
-        try:
-            # 调用你的 main.py
-            result = subprocess.run(
-                ["python", "main.py", "--rsid", rsid],
-                capture_output=True, text=True, check=True
-            )
-            # 假设 main.py 输出 chrom, pos, ref, alt, delta_score 逗号分隔
-            output_line = result.stdout.strip()
-            if output_line:
-                chrom, pos, ref, alt, delta = output_line.split(",")
-                results.append({
-                    "rsid": rsid,
-                    "chrom": chrom,
-                    "pos": pos,
-                    "ref": ref,
-                    "alt": alt,
-                    "delta_score": delta
-                })
-        except subprocess.CalledProcessError as e:
-            print(f"[WARN] {rsid} 处理失败: {e.stderr.strip()}")
+            # 在 INFO 字段中查找 rsID
+            tokens = info.split(";")
+            for t in tokens:
+                if t.startswith("RSID="):
+                    rsid = t.replace("RSID=", "")
+                    break
 
-    # 保存 CSV
-    with open(output_csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["rsid", "chrom", "pos", "ref", "alt", "delta_score"])
-        writer.writeheader()
-        for row in results:
-            writer.writerow(row)
+            if rsid is None:
+                continue
 
-    print(f"[FINISHED] 结果已保存到 {output_csv}")
+            print(f"[RUN] {rsid} {chrom}:{pos} {ref}>{alt}")
+
+            try:
+                delta = score_single_variant(rsid, chrom, pos, ref, alt)
+                rows.append([rsid, chrom, pos, ref, alt, delta])
+            except Exception as e:
+                print(f"[WARN] {rsid} failed: {e}")
+                continue
+
+    # 保存结果
+    with open(out_csv, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["rsid", "chrom", "pos", "ref", "alt", "delta"])
+        writer.writerows(rows)
+
+    print(f"[DONE] 结果已保存到 {out_csv}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--vcf", required=True)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
+
+    parse_vcf_and_score(args.vcf, args.out)
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--vcf", required=True, help="输入 VCF 文件")
-    parser.add_argument("--out", default="results.csv", help="输出 CSV 文件")
-    args = parser.parse_args()
-    main(args.vcf, args.out)
+    main()
