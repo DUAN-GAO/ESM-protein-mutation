@@ -40,7 +40,7 @@ def main(vcf_path, output_csv="results.csv"):
     for rsid, chrom, pos, ref, alt in variants:
         print(f"[RUN] 处理 {rsid} ...")
         try:
-            delta = score_single_variant(rsid, chrom, pos, ref, alt)
+            delta = score_variant(rsid, chrom, pos, ref, alt)
             results.append({"rsid": rsid, "chrom": chrom, "pos": pos, "ref": ref, "alt": alt, "delta_score": delta})
         except Exception as e:
             print(f"[WARN] {rsid} 处理失败: {e}")
