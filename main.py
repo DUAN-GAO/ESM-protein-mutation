@@ -1,100 +1,89 @@
-import argparse
-import myvariant
+import gzip
 import pandas as pd
+import myvariant
 from alphagenome.data import genome
 from alphagenome.models import dna_client
-from alphagenome import colab_utils
-from alphagenome.data import gene_annotation
-from alphagenome.data import transcript as transcript_utils
 from alphagenome.models import variant_scorers
 
-
-# 固定 API Key
 API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
+def extract_rsids_from_vcf(vcf_path):
+    opener = gzip.open if vcf_path.endswith(".gz") else open
+    rsids = []
+    with opener(vcf_path, "rt") as f:
+        for line in f:
+            if line.startswith("#"):
+                continue
+            fields = line.strip().split("\t")
+            info = fields[7] if len(fields) > 7 else ""
+            if "CSQ=" in info:
+                csq_entries = info.split("CSQ=")[1].split(",")
+                for entry in csq_entries:
+                    cols = entry.split("|")
+                    for col in cols:
+                        col = col.strip()
+                        if col.startswith("rs") and col[2:].isdigit():
+                            rsids.append(col)
+    return list(set(rsids))
 
-def rsid_to_variant_info(rsid, genome_build="hg38"):
-    """
-    输入 rsID，返回:
-    chromosome='chr22', position=36201698, reference_bases='A', alternate_bases='C'
-    仅适用 SNV
-    """
+def rsid_to_variant_info(rsid):
     mv = myvariant.MyVariantInfo()
-    out = mv.getvariant(rsid, fields="dbsnp")
+    out = mv.getvariant(rsid, fields="dbsnp.hg38")
     if not out or "dbsnp" not in out:
-        raise ValueError(f"{rsid} 未找到相关 dbSNP 信息")
-
+        return None
     dbsnp = out["dbsnp"]
-    vartype = dbsnp.get("vartype", "").lower()
-    if vartype != "snv":
-        raise ValueError(f"{rsid} 不是单核苷酸变异 (SNV)")
-
-    ref_base = dbsnp.get("ref")
-    alt_base = dbsnp.get("alt")
+    hg38 = dbsnp.get("hg38", {})
     chrom = dbsnp.get("chrom")
-    pos = dbsnp.get(genome_build, {}).get("start")
+    pos = hg38.get("start")
+    ref = dbsnp.get("ref")
+    alt = dbsnp.get("alt")
+    if None in [chrom, pos, ref, alt]:
+        return None
+    return f"chr{chrom}", pos, ref, alt
 
-    if None in [ref_base, alt_base, chrom, pos]:
-        raise ValueError(f"{rsid} 坐标或碱基信息不完整")
-
-    return f"chr{chrom}", pos, ref_base, alt_base
-
-
-def main(rsid):
-    # 初始化模型
-    print('API reached...')
-    dna_model = dna_client.create(API_KEY)
-    
-    # # 下载并处理 GTF 文件（只需第一次）
-    # gtf = pd.read_feather(
-    #     "https://storage.googleapis.com/alphagenome/reference/gencode/"
-    #     "hg38/gencode.v46.annotation.gtf.gz.feather"
-    # )
-    # gtf_transcripts = gene_annotation.filter_protein_coding(gtf)
-    # gtf_transcripts = gene_annotation.filter_to_longest_transcript(gtf_transcripts)
-    # transcript_extractor = transcript_utils.TranscriptExtractor(gtf_transcripts)
-
-    # rsID 转换成 variant
-    chrom, pos, ref, alt = rsid_to_variant_info(rsid)
-    print(f"[INFO] {rsid} -> {chrom}:{pos} {ref}>{alt}")
-
-    variant = genome.Variant(
-        chromosome=chrom,
-        position=pos,
-        reference_bases=ref,
-        alternate_bases=alt,
-    )
-
-    # 定义预测区间
-    sequence_length = 2048
-    interval = variant.reference_interval.resize(sequence_length)
-
-    # 定义 scorer（CenterMaskScorer）
+def score_rsid(dna_model, rsid):
+    info = rsid_to_variant_info(rsid)
+    if not info:
+        print(f"[WARN] {rsid} 信息不完整或未找到 hg38 坐标")
+        return None
+    chrom, pos, ref, alt = info
+    variant = genome.Variant(chromosome=chrom, position=pos, reference_bases=ref, alternate_bases=alt)
+    interval = variant.reference_interval.resize(2048)
     scorer = variant_scorers.CenterMaskScorer(
         width=None,
         aggregation_type=variant_scorers.AggregationType.DIFF_SUM_LOG2,
         requested_output=dna_client.OutputType.RNA_SEQ,
     )
+    try:
+        score_result = dna_model.score_variant(
+            interval=interval,
+            variant=variant,
+            variant_scorers=[scorer],
+            organism=dna_client.Organism.HOMO_SAPIENS,
+        )
+        return chrom, pos, ref, alt, score_result[0].var
+    except Exception as e:
+        print(f"[ERROR] {rsid} 打分失败: {e}")
+        return None
 
-    # 打分
-    score_result = dna_model.score_variant(
-        interval=interval,
-        variant=variant,
-        variant_scorers=[scorer],
-        organism=dna_client.Organism.HOMO_SAPIENS,
-    )
-
-    # 保存到以 rsID 命名的 txt 文件
-    output_file = f"{rsid}.txt"
-    with open(output_file, "w") as f:
-        f.write(str(score_result[0].var))
-
-    print(f"[RESULT] 已保存 score_result[0].var 到 {output_file}")
-
+def main(vcf_path, out_csv="results.csv"):
+    dna_model = dna_client.create(API_KEY)
+    rsids = extract_rsids_from_vcf(vcf_path)
+    results = []
+    for rsid in rsids:
+        print(f"[RUN] 处理 {rsid}")
+        res = score_rsid(dna_model, rsid)
+        if res:
+            chrom, pos, ref, alt, delta = res
+            results.append({"rsid": rsid, "chrom": chrom, "pos": pos, "ref": ref, "alt": alt, "delta_score": delta})
+    df = pd.DataFrame(results)
+    df.to_csv(out_csv, index=False)
+    print(f"[FINISHED] 已保存 {len(results)} 条结果到 {out_csv}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Query rsID and score variant with AlphaGenome.")
-    parser.add_argument("--rsid", type=str, required=True, help="dbSNP rsID, e.g. rs5934683")
-
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--vcf", required=True)
+    parser.add_argument("--out", default="results.csv")
     args = parser.parse_args()
-    main(args.rsid)
+    main(args.vcf, args.out)
