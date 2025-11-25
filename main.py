@@ -1,74 +1,100 @@
-import torch
 import argparse
-from esm import pretrained
-import time
+import myvariant
+import pandas as pd
+from alphagenome.data import genome
+from alphagenome.models import dna_client
+from alphagenome import colab_utils
+from alphagenome.data import gene_annotation
+from alphagenome.data import transcript as transcript_utils
+from alphagenome.models import variant_scorers
 
 
-def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
-    # 加载预训练模型 ESM-1b
-    model, alphabet = pretrained.esm1b_t33_650M_UR50S()
-    model.eval()
+# 固定 API Key
+API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
-    # 构建批次转换器
-    batch_converter = alphabet.get_batch_converter()
 
-    # 1. 生成带掩码的序列
-    seq = list(wildtype_sequence)
-    seq[mutation_position] = alphabet.get_tok(alphabet.mask_idx)
-    masked_sequence_str = "".join(seq)
+def rsid_to_variant_info(rsid, genome_build="hg19"):
+    """
+    输入 rsID，返回:
+    chromosome='chr22', position=36201698, reference_bases='A', alternate_bases='C'
+    仅适用 SNV
+    """
+    mv = myvariant.MyVariantInfo()
+    out = mv.getvariant(rsid, fields="dbsnp")
+    if not out or "dbsnp" not in out:
+        raise ValueError(f"{rsid} 未找到相关 dbSNP 信息")
 
-    # 2. 转换为Token格式
-    data = [("protein", masked_sequence_str)]
-    _, _, batch_tokens = batch_converter(data)
+    dbsnp = out["dbsnp"]
+    vartype = dbsnp.get("vartype", "").lower()
+    if vartype != "snv":
+        raise ValueError(f"{rsid} 不是单核苷酸变异 (SNV)")
 
-    # 3. 输入模型
-    with torch.no_grad():
-        outputs = model(batch_tokens, repr_layers=[])
-        logits = outputs["logits"]
+    ref_base = dbsnp.get("ref")
+    alt_base = dbsnp.get("alt")
+    chrom = dbsnp.get("chrom")
+    pos = dbsnp.get(genome_build, {}).get("start")
 
-    # 4. 提取突变位点logits并softmax成概率
-    mask_logits = logits[0, mutation_position+1, :]
-    probabilities = torch.softmax(mask_logits, dim=0)
+    if None in [ref_base, alt_base, chrom, pos]:
+        raise ValueError(f"{rsid} 坐标或碱基信息不完整")
 
-    # 5. 获取野生型和突变型氨基酸概率
-    wt_idx = alphabet.get_idx(wildtype_aa)
-    mut_idx = alphabet.get_idx(mutant_aa)
+    return f"chr{chrom}", pos, ref_base, alt_base
 
-    p_wild = probabilities[wt_idx].item()
-    p_mutant = probabilities[mut_idx].item()
 
-    # 6. 计算Δscore
-    epsilon = 1e-10
-    delta_score = torch.log(torch.tensor(p_mutant + epsilon) / torch.tensor(p_wild + epsilon)).item()
+def main(rsid):
+    # 初始化模型
+    print('API reached...')
+    dna_model = dna_client.create(API_KEY)
+    
+    # # 下载并处理 GTF 文件（只需第一次）
+    # gtf = pd.read_feather(
+    #     "https://storage.googleapis.com/alphagenome/reference/gencode/"
+    #     "hg38/gencode.v46.annotation.gtf.gz.feather"
+    # )
+    # gtf_transcripts = gene_annotation.filter_protein_coding(gtf)
+    # gtf_transcripts = gene_annotation.filter_to_longest_transcript(gtf_transcripts)
+    # transcript_extractor = transcript_utils.TranscriptExtractor(gtf_transcripts)
 
-    return delta_score, p_wild, p_mutant
+    # rsID 转换成 variant
+    chrom, pos, ref, alt = rsid_to_variant_info(rsid)
+    print(f"[INFO] {rsid} -> {chrom}:{pos} {ref}>{alt}")
+
+    variant = genome.Variant(
+        chromosome=chrom,
+        position=pos,
+        reference_bases=ref,
+        alternate_bases=alt,
+    )
+
+    # 定义预测区间
+    sequence_length = 2048
+    interval = variant.reference_interval.resize(sequence_length)
+
+    # 定义 scorer（CenterMaskScorer）
+    scorer = variant_scorers.CenterMaskScorer(
+        width=None,
+        aggregation_type=variant_scorers.AggregationType.DIFF_SUM_LOG2,
+        requested_output=dna_client.OutputType.RNA_SEQ,
+    )
+
+    # 打分
+    score_result = dna_model.score_variant(
+        interval=interval,
+        variant=variant,
+        variant_scorers=[scorer],
+        organism=dna_client.Organism.HOMO_SAPIENS,
+    )
+
+    # 保存到以 rsID 命名的 txt 文件
+    output_file = f"{rsid}.txt"
+    with open(output_file, "w") as f:
+        f.write(str(score_result[0].var))
+
+    print(f"[RESULT] 已保存 score_result[0].var 到 {output_file}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Compute ESM mutation delta score")
-    parser.add_argument("--seq", type=str, required=True,
-                        help="Wild-type protein sequence (string or FASTA file path)")
-    parser.add_argument("--pos", type=int, required=True,
-                        help="Mutation position (0-based index)")
-    parser.add_argument("--wt", type=str, required=True,
-                        help="Wild-type amino acid (single letter)")
-    parser.add_argument("--mut", type=str, required=True,
-                        help="Mutant amino acid (single letter)")
+    parser = argparse.ArgumentParser(description="Query rsID and score variant with AlphaGenome.")
+    parser.add_argument("--rsid", type=str, required=True, help="dbSNP rsID, e.g. rs5934683")
 
     args = parser.parse_args()
-
-    # 如果输入是fasta文件，读取序列
-    sequence = args.seq
-    if sequence.endswith(".fasta") or sequence.endswith(".fa"):
-        with open(sequence, "r") as f:
-            lines = f.readlines()
-            sequence = "".join([l.strip() for l in lines if not l.startswith(">")])
-    start_time = time.time()
-
-    delta, p_wt, p_mut = compute_delta_score(sequence, args.pos, args.wt, args.mut)
-    
-    end_time = time.time()
-    print(f"Elapsed time: {end_time - start_time:.2f} seconds")
-    print(f"Wild type amino acid {args.wt} likelihood: {p_wt:.6f}")
-    print(f"Mutant type amino acid {args.mut} likelihood: {p_mut:.6f}")
-    print(f"Δscore (log likelihood ratio): {delta:.4f}")
+    main(args.rsid)
