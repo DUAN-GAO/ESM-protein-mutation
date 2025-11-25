@@ -1,13 +1,14 @@
-import argparse
 from alphagenome.data import genome
 from alphagenome.models import dna_client, variant_scorers
 
-
 API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
-
-def score_single_variant(rsid, chrom, pos, ref, alt):
-    print(f"[INFO] Running {rsid}: {chrom}:{pos} {ref}>{alt}")
+# ---------------- 核心函数 ----------------
+def score_variant(rsid, chrom, pos, ref, alt):
+    """
+    输入 rsID 和变异位点信息，返回 delta_score
+    """
+    print(f"[INFO] Scoring {rsid}: {chrom}:{pos} {ref}>{alt}")
 
     # 初始化模型
     dna_model = dna_client.create(API_KEY)
@@ -20,7 +21,7 @@ def score_single_variant(rsid, chrom, pos, ref, alt):
         alternate_bases=alt,
     )
 
-    # 自动匹配 AlphaGenome 支持的最小窗口 16384bp
+    # AlphaGenome 支持的最小窗口 16384bp
     interval = variant.reference_interval.resize(16384)
 
     scorer = variant_scorers.CenterMaskScorer(
@@ -38,33 +39,29 @@ def score_single_variant(rsid, chrom, pos, ref, alt):
 
     delta = result[0].var
     print(f"[OK] {rsid} Δ = {delta}")
-
     return delta
 
+# ---------------- 命令行调用 ----------------
+if __name__ == "__main__":
+    import argparse, csv
 
-def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rsid", required=True)
     parser.add_argument("--chrom", required=True)
     parser.add_argument("--pos", required=True)
     parser.add_argument("--ref", required=True)
     parser.add_argument("--alt", required=True)
+    parser.add_argument("--out", default=None, help="可选输出 CSV 文件")
     args = parser.parse_args()
 
-    delta = score_single_variant(
-        rsid=args.rsid,
-        chrom=args.chrom,
-        pos=args.pos,
-        ref=args.ref,
-        alt=args.alt
-    )
+    delta = score_variant(args.rsid, args.chrom, args.pos, args.ref, args.alt)
 
-    # 输出 CSV 格式
-    with open(f"{args.rsid}.txt", "w") as f:
-        f.write(f"{args.rsid},{args.chrom},{args.pos},{args.ref},{args.alt},{delta}\n")
-
-    print(f"[SAVE] {args.rsid}.txt written.")
-
-
-if __name__ == "__main__":
-    main()
+    # 输出 TXT 或 CSV
+    if args.out:
+        with open(args.out, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([args.rsid, args.chrom, args.pos, args.ref, args.alt, delta])
+    else:
+        with open(f"{args.rsid}.txt", "w") as f:
+            f.write(f"{args.rsid},{args.chrom},{args.pos},{args.ref},{args.alt},{delta}\n")
+        print(f"[SAVE] {args.rsid}.txt written.")

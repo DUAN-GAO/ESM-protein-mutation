@@ -1,58 +1,56 @@
-import argparse
 import csv
-from main import score_single_variant
+import argparse
+from main import score_variant  # 假设你把 main.py 的核心逻辑封装成函数 score_variant(chrom, pos, ref, alt, rsid)
 
-
-def parse_vcf_and_score(vcf_path, out_csv):
-    rows = []
-
+def parse_vcf(vcf_path):
+    variants = []
     with open(vcf_path) as f:
         for line in f:
             if line.startswith("#"):
                 continue
-
             fields = line.strip().split("\t")
-            chrom, pos, _, ref, alt = fields[:5]
+            chrom, pos, _, ref, alt, _, _, info = fields[:8]
 
-            info = fields[7]
+            # 从 CSQ 提取 rsID
             rsid = None
-
-            # 在 INFO 字段中查找 rsID
-            tokens = info.split(";")
-            for t in tokens:
-                if t.startswith("RSID="):
-                    rsid = t.replace("RSID=", "")
-                    break
-
+            if "CSQ=" in info:
+                csq_entries = info.split("CSQ=")[1].split(",")
+                for e in csq_entries:
+                    parts = e.split("|")
+                    for p in parts:
+                        if p.startswith("rs"):
+                            rsid = p
+                            break
+                    if rsid:
+                        break
             if rsid is None:
                 continue
 
-            print(f"[RUN] {rsid} {chrom}:{pos} {ref}>{alt}")
+            variants.append((rsid, chrom, int(pos), ref, alt))
+    return variants
 
-            try:
-                delta = score_single_variant(rsid, chrom, pos, ref, alt)
-                rows.append([rsid, chrom, pos, ref, alt, delta])
-            except Exception as e:
-                print(f"[WARN] {rsid} failed: {e}")
-                continue
+def main(vcf_path, out_csv):
+    variants = parse_vcf(vcf_path)
+    results = []
 
-    # 保存结果
+    for rsid, chrom, pos, ref, alt in variants:
+        print(f"[RUN] {rsid} {chrom}:{pos} {ref}>{alt}")
+        try:
+            delta = score_variant(chrom, pos, ref, alt, rsid)  # 直接调用 main.py 核心函数
+            results.append([rsid, chrom, pos, ref, alt, delta])
+        except Exception as e:
+            print(f"[WARN] {rsid} failed: {e}")
+
+    # 写 CSV
     with open(out_csv, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["rsid", "chrom", "pos", "ref", "alt", "delta"])
-        writer.writerows(rows)
-
+        writer.writerows(results)
     print(f"[DONE] 结果已保存到 {out_csv}")
 
-
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--vcf", required=True)
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--out", default="results.csv")
     args = parser.parse_args()
-
-    parse_vcf_and_score(args.vcf, args.out)
-
-
-if __name__ == "__main__":
-    main()
+    main(args.vcf, args.out)
