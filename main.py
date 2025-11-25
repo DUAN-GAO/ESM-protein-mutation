@@ -1,11 +1,8 @@
 import argparse
-import myvariant
+import requests
 import pandas as pd
 from alphagenome.data import genome
 from alphagenome.models import dna_client
-from alphagenome import colab_utils
-from alphagenome.data import gene_annotation
-from alphagenome.data import transcript as transcript_utils
 from alphagenome.models import variant_scorers
 
 
@@ -15,39 +12,55 @@ API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
 def rsid_to_variant_info(rsid):
     """
-    输入 rsID，返回 hg38 坐标:
-    chromosome='chr22', position=36201698, reference_bases='A', alternate_bases='C'
-    仅适用 SNV
+    使用 NCBI Variation API 获取 hg38 坐标：
+    输入 rsID，返回:
+        chromosome='chr1'
+        position=1234567
+        reference_bases='A'
+        alternate_bases='G'
     """
-    mv = myvariant.MyVariantInfo()
-    # 使用 dbsnp.hg38 字段获取 hg38 坐标
-    out = mv.getvariant(rsid, fields="dbsnp.hg38")
-    if not out or "dbsnp" not in out:
-        raise ValueError(f"{rsid} 未找到相关 dbSNP 信息")
 
-    dbsnp = out["dbsnp"]
-    vartype = dbsnp.get("vartype", "").lower()
-    if vartype != "snv":
-        raise ValueError(f"{rsid} 不是单核苷酸变异 (SNV)")
+    numeric_id = rsid.replace("rs", "")
+    url = f"https://api.ncbi.nlm.nih.gov/variation/v0/refsnp/{numeric_id}"
 
-    ref_base = dbsnp.get("ref")
-    alt_base = dbsnp.get("alt")
-    chrom = dbsnp.get("chrom")
-    hg38_info = dbsnp.get("hg38", {})
-    pos = hg38_info.get("start")
+    r = requests.get(url, timeout=10)
 
-    if None in [ref_base, alt_base, chrom, pos]:
-        raise ValueError(f"{rsid} 坐标或碱基信息不完整")
+    if r.status_code != 200:
+        raise ValueError(f"{rsid} NCBI API 查询失败: HTTP {r.status_code}")
 
-    return f"chr{chrom}", pos, ref_base, alt_base
+    data = r.json()
+
+    # 解析 primary_assembly（GRCh38）
+    placements = data.get("primary_snapshot_data", {}).get("placements_with_allele", [])
+
+    # 找 hg38 + 有 REF/ALT 的 SNV
+    for p in placements:
+        if not p.get("is_ptlp"):  # 只取主组学坐标
+            continue
+
+        for allele in p.get("alleles", []):
+            spdi = allele.get("allele", {}).get("spdi")
+            if spdi:
+                # 只处理 SNV
+                if len(spdi["deleted_sequence"]) == 1 and len(spdi["inserted_sequence"]) == 1:
+                    chrom = spdi["seq_id"].replace("NC_", "").replace(".11", "")
+                    chrom = chrom.lstrip("0")  # 例如 "000001" → "1"
+
+                    ref = spdi["deleted_sequence"]
+                    alt = spdi["inserted_sequence"]
+                    pos = int(spdi["position"]) + 1  # SPDI 坐标从 0 开始 → 转为 1-based
+
+                    return f"chr{chrom}", pos, ref, alt
+
+    raise ValueError(f"{rsid} 未找到 hg38 SNV 位点")
 
 
 def main(rsid):
-    # 初始化模型
+    # 初始化 AlphaGenome 模型
     print('API reached...')
     dna_model = dna_client.create(API_KEY)
-    
-    # rsID 转换成 variant
+
+    # rsID → hg38 variant
     chrom, pos, ref, alt = rsid_to_variant_info(rsid)
     print(f"[INFO] {rsid} -> {chrom}:{pos} {ref}>{alt}")
 
@@ -58,7 +71,7 @@ def main(rsid):
         alternate_bases=alt,
     )
 
-    # 定义预测区间
+    # 定义预测区间（2048 bp）
     sequence_length = 2048
     interval = variant.reference_interval.resize(sequence_length)
 
@@ -77,7 +90,7 @@ def main(rsid):
         organism=dna_client.Organism.HOMO_SAPIENS,
     )
 
-    # 保存到以 rsID 命名的 txt 文件
+    # 保存到 rsID.txt
     output_file = f"{rsid}.txt"
     with open(output_file, "w") as f:
         f.write(str(score_result[0].var))
