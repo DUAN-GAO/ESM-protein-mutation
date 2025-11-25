@@ -7,33 +7,28 @@ import torch
 import gzip
 
 # ---------------- compute_delta_score ----------------
-def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
+def compute_delta_score(seq, aa_pos, wt, mut):
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
 
     batch_converter = alphabet.get_batch_converter()
-    seq = list(wildtype_sequence)
-    seq[mutation_position] = alphabet.get_tok(alphabet.mask_idx)
-    masked_sequence_str = "".join(seq)
-
-    data = [("protein", masked_sequence_str)]
+    masked_seq = list(seq)
+    masked_seq[aa_pos] = alphabet.get_tok(alphabet.mask_idx)
+    masked_seq_str = "".join(masked_seq)
+    data = [("protein", masked_seq_str)]
     _, _, batch_tokens = batch_converter(data)
 
     with torch.no_grad():
         outputs = model(batch_tokens, repr_layers=[])
         logits = outputs["logits"]
 
-    mask_logits = logits[0, mutation_position + 1, :]
-    probabilities = torch.softmax(mask_logits, dim=0)
-
-    wt_idx = alphabet.get_idx(wildtype_aa)
-    mut_idx = alphabet.get_idx(mutant_aa)
-
-    p_wild = probabilities[wt_idx].item()
-    p_mutant = probabilities[mut_idx].item()
+    mask_logits = logits[0, aa_pos + 1, :]
+    probs = torch.softmax(mask_logits, dim=0)
+    p_wt = probs[alphabet.get_idx(wt)].item()
+    p_mut = probs[alphabet.get_idx(mut)].item()
 
     epsilon = 1e-10
-    delta_score = torch.log(torch.tensor(p_mutant + epsilon) / torch.tensor(p_wild + epsilon)).item()
+    delta_score = torch.log(torch.tensor(p_mut + epsilon) / torch.tensor(p_wt + epsilon)).item()
     return delta_score
 
 # ---------------- helpers ----------------
@@ -58,7 +53,7 @@ def load_vcf(path):
                 variants.append({"chrom": chrom, "pos": int(pos), "ref": ref, "alt": alt})
     return variants
 
-# ---------------- VEP annotation (HG38, fixed) ----------------
+# ---------------- VEP annotation ----------------
 def annotate_with_vep(variants, chunk_size=200, pause=0.2):
     endpoint = "https://rest.ensembl.org/vep/human/region"
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -73,12 +68,9 @@ def annotate_with_vep(variants, chunk_size=200, pause=0.2):
         for attempt in range(4):
             try:
                 r = requests.post(endpoint, headers=headers, json=payload, timeout=30)
-                if r.status_code == 200:
-                    break
-                elif r.status_code == 429:
-                    time.sleep((2 ** attempt) * 1.0)
-                else:
-                    time.sleep(0.5)
+                if r.status_code == 200: break
+                elif r.status_code == 429: time.sleep((2**attempt)*1.0)
+                else: time.sleep(0.5)
             except Exception as e:
                 print(f"[DEBUG] VEP request exception: {e}", file=sys.stderr)
                 time.sleep(0.5)
@@ -89,7 +81,7 @@ def annotate_with_vep(variants, chunk_size=200, pause=0.2):
 
         try:
             data = r.json()
-        except Exception as e:
+        except Exception:
             for v in chunk: results.append({**v, "vep": None})
             continue
 
@@ -101,14 +93,12 @@ def annotate_with_vep(variants, chunk_size=200, pause=0.2):
 
 # ---------------- HGVS parsing ----------------
 def three_to_one(aa):
-    table = {
-        'Ala':'A','Arg':'R','Asn':'N','Asp':'D','Cys':'C','Gln':'Q','Glu':'E','Gly':'G',
-        'His':'H','Ile':'I','Leu':'L','Lys':'K','Met':'M','Phe':'F','Pro':'P','Ser':'S',
-        'Thr':'T','Trp':'W','Tyr':'Y','Val':'V','Sec':'U','Pyl':'O'
-    }
+    table = {'Ala':'A','Arg':'R','Asn':'N','Asp':'D','Cys':'C','Gln':'Q','Glu':'E','Gly':'G',
+             'His':'H','Ile':'I','Leu':'L','Lys':'K','Met':'M','Phe':'F','Pro':'P','Ser':'S',
+             'Thr':'T','Trp':'W','Tyr':'Y','Val':'V','Sec':'U','Pyl':'O'}
     if aa is None: return None
     aa = str(aa)
-    if len(aa) == 1: return aa
+    if len(aa)==1: return aa
     return table.get(aa, aa[0] if len(aa)>0 else None)
 
 def parse_hgvsp(hgvsp):
@@ -127,10 +117,9 @@ def fetch_protein_seq(ensp_id):
     url = f"https://rest.ensembl.org/sequence/id/{ensp_id}"
     try:
         r = requests.get(url, headers={"Accept": "text/x-fasta"}, params={"type":"protein"}, timeout=20)
-        if r.status_code == 200:
+        if r.status_code==200:
             lines = r.text.strip().splitlines()
-            seq = "".join([l.strip() for l in lines if not l.startswith(">")])
-            return seq
+            return "".join([l.strip() for l in lines if not l.startswith(">")])
     except Exception as e:
         print(f"[DEBUG] fetch_protein_seq failed: {e}", file=sys.stderr)
     return None
@@ -163,7 +152,7 @@ def main():
 
             tc = None
             for t in protein_tcs:
-                if t.get("canonical") == 1 and t.get("protein_id") and t.get("hgvsp"):
+                if t.get("canonical")==1 and t.get("protein_id") and t.get("hgvsp"):
                     tc = t; break
             if not tc:
                 for t in protein_tcs:
@@ -177,8 +166,7 @@ def main():
                 continue
 
             protein_id = tc.get("protein_id")
-            hgvsp = tc.get("hgvsp")
-            parsed = parse_hgvsp(hgvsp) if hgvsp else None
+            parsed = parse_hgvsp(tc.get("hgvsp")) if tc.get("hgvsp") else None
             if not parsed and tc.get("amino_acids") and tc.get("protein_start"):
                 aa = tc["amino_acids"].split("/")
                 if len(aa)==2:
@@ -193,14 +181,15 @@ def main():
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
-            aa_pos = parsed["pos"] - 1
-            if aa_pos < 0 or aa_pos >= len(seq):
+            aa_pos = parsed["pos"]-1
+            if aa_pos<0 or aa_pos>=len(seq):
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
             try:
                 delta = compute_delta_score(seq, aa_pos, parsed["ref"], parsed["alt"])
-            except:
+            except Exception as e:
+                print(f"[DEBUG] delta_score failed: {e}", file=sys.stderr)
                 delta = None
 
             w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], delta])
