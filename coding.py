@@ -27,7 +27,7 @@ def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutan
         outputs = model(batch_tokens, repr_layers=[])
         logits = outputs["logits"]
 
-    mask_logits = logits[0, mutation_position+1, :]
+    mask_logits = logits[0, mutation_position + 1, :]
     probabilities = torch.softmax(mask_logits, dim=0)
 
     wt_idx = alphabet.get_idx(wildtype_aa)
@@ -72,13 +72,11 @@ def load_vcf(path):
     return variants
 
 
-# ---------------- VEP annotation ----------------
-def annotate_with_vep(variant_list, assembly="grch37", chunk_size=200):
+# ---------------- VEP annotation (HG38 version) ----------------
+def annotate_with_vep(variant_list, assembly="grch38", chunk_size=200):
 
-    if assembly == "grch38":
-        endpoint = "https://rest.ensembl.org/vep/homo_sapiens/region"
-    else:
-        endpoint = "https://rest.ensembl.org/vep/homo_sapiens/region/GRCh37"
+    # ---- HG38 endpoint ----
+    endpoint = "https://rest.ensembl.org/vep/homo_sapiens/region"
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     results = []
@@ -133,7 +131,7 @@ def three_to_one(aa):
         'His':'H','Ile':'I','Leu':'L','Lys':'K','Met':'M','Phe':'F','Pro':'P','Ser':'S',
         'Thr':'T','Trp':'W','Tyr':'Y','Val':'V','Sec':'U','Pyl':'O'
     }
-    if len(aa)==1:
+    if len(aa) == 1:
         return aa
     return table.get(aa, aa[0])
 
@@ -159,7 +157,9 @@ def parse_hgvsp(hgvsp):
 
 # ---------------- fetch protein ----------------
 def fetch_protein_seq(ensp_id):
-    url = f"http://grch37.rest.ensembl.org/sequence/id/{ensp_id}"
+
+    # HG38 API (different hostname)
+    url = f"https://rest.ensembl.org/sequence/id/{ensp_id}"
 
     try:
         r = requests.get(
@@ -184,14 +184,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vcf", required=True)
     parser.add_argument("--out", required=True)
-    parser.add_argument("--assembly", default="grch37", choices=["grch37","grch38"])
+    parser.add_argument("--assembly", default="grch38", choices=["grch38"])
     args = parser.parse_args()
 
     print(f"[DEBUG] Loading VCF {args.vcf}...")
     variants = load_vcf(args.vcf)
     print(f"[DEBUG] {len(variants)} variants loaded")
 
-    print("[DEBUG] Querying VEP...")
+    print("[DEBUG] Querying VEP (hg38)...")
     annotated = annotate_with_vep(variants, assembly=args.assembly)
     print(f"[DEBUG] VEP annotation done, {len(annotated)} records")
 
@@ -204,9 +204,6 @@ def main():
             vep = v.get("vep")
             delta_score = None
 
-            # -----------------------------------------------------------------
-            # no VEP
-            # -----------------------------------------------------------------
             if not vep:
                 print(f"[DEBUG] No VEP result for {v['chrom']}:{v['pos']}")
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
@@ -218,31 +215,21 @@ def main():
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
 
-            # -----------------------------------------------------------------
-            # new logic: choose a usable transcript
-            # -----------------------------------------------------------------
             tc = None
-
-            # 1) canonical + protein_id + hgvsp
             for t in tc_list:
                 if t.get("canonical") == 1 and t.get("protein_id") and t.get("hgvsp"):
                     tc = t
                     break
-
-            # 2) any transcript with protein_id + hgvsp
             if not tc:
                 for t in tc_list:
                     if t.get("protein_id") and t.get("hgvsp"):
                         tc = t
                         break
-
-            # 3) fallback: transcript with protein_id only (hgvsp may be missing)
             if not tc:
                 for t in tc_list:
                     if t.get("protein_id"):
                         tc = t
                         break
-
             if not tc:
                 print(f"[DEBUG] No usable transcript for {v['chrom']}:{v['pos']}")
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
