@@ -1,37 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse, csv, time, requests, sys
+import argparse, csv, time, requests, sys, gzip
 from esm import pretrained
 import torch
-import gzip
+import re
 
-# ---------------- compute_delta_score ----------------
-def compute_delta_score(seq, aa_pos, wt, mut):
-    model, alphabet = pretrained.esm1b_t33_650M_UR50S()
-    model.eval()
+# ---------------- Global ESM model ----------------
+print("[INFO] Loading ESM model...")
+MODEL, ALPHABET = pretrained.esm1b_t33_650M_UR50S()
+MODEL.eval()
+BATCH_CONVERTER = ALPHABET.get_batch_converter()
+print("[INFO] ESM model loaded.")
 
-    batch_converter = alphabet.get_batch_converter()
-    masked_seq = list(seq)
-    masked_seq[aa_pos] = alphabet.get_tok(alphabet.mask_idx)
-    masked_seq_str = "".join(masked_seq)
-    data = [("protein", masked_seq_str)]
-    _, _, batch_tokens = batch_converter(data)
-
-    with torch.no_grad():
-        outputs = model(batch_tokens, repr_layers=[])
-        logits = outputs["logits"]
-
-    mask_logits = logits[0, aa_pos + 1, :]
-    probs = torch.softmax(mask_logits, dim=0)
-    p_wt = probs[alphabet.get_idx(wt)].item()
-    p_mut = probs[alphabet.get_idx(mut)].item()
-
-    epsilon = 1e-10
-    delta_score = torch.log(torch.tensor(p_mut + epsilon) / torch.tensor(p_wt + epsilon)).item()
-    return delta_score
-
-# ---------------- helpers ----------------
+# ---------------- Helpers ----------------
 def _normalize_chrom(chrom):
     chrom = str(chrom)
     if chrom.lower().startswith("chr"):
@@ -87,7 +69,6 @@ def annotate_with_vep(variants, chunk_size=200, pause=0.2):
 
         for v, raw in zip(chunk, data):
             results.append({**v, "vep": raw})
-
         time.sleep(pause)
     return results
 
@@ -106,13 +87,12 @@ def parse_hgvsp(hgvsp):
     if ":p." in hgvsp: p = hgvsp.split(":p.")[1]
     elif "p." in hgvsp: p = hgvsp.split("p.")[1]
     else: p = hgvsp
-    import re
     m = re.match(r"([A-Za-z]{1,3}|[A-Za-z])(\d+)([A-Za-z]{1,3}|\*|[A-Za-z])", p)
     if not m: return None
     ref, pos, alt = m.group(1), int(m.group(2)), m.group(3)
     return {"ref": three_to_one(ref), "pos": pos, "alt": three_to_one(alt) if alt!="*" else "*"}
 
-# ---------------- fetch protein sequence ----------------
+# ---------------- fetch protein ----------------
 def fetch_protein_seq(ensp_id):
     url = f"https://rest.ensembl.org/sequence/id/{ensp_id}"
     try:
@@ -120,9 +100,38 @@ def fetch_protein_seq(ensp_id):
         if r.status_code==200:
             lines = r.text.strip().splitlines()
             return "".join([l.strip() for l in lines if not l.startswith(">")])
+        else:
+            print(f"[WARN] Protein fetch failed for {ensp_id}: {r.status_code}", file=sys.stderr)
     except Exception as e:
-        print(f"[DEBUG] fetch_protein_seq failed: {e}", file=sys.stderr)
+        print(f"[WARN] Protein fetch exception: {e}", file=sys.stderr)
     return None
+
+# ---------------- delta_score ----------------
+def compute_delta_score(seq, aa_pos, wt, mut):
+    masked_seq = list(seq)
+    masked_seq[aa_pos] = ALPHABET.get_tok(ALPHABET.mask_idx)
+    masked_seq_str = "".join(masked_seq)
+    data = [("protein", masked_seq_str)]
+    _, _, batch_tokens = BATCH_CONVERTER(data)
+
+    with torch.no_grad():
+        outputs = MODEL(batch_tokens, repr_layers=[])
+        logits = outputs["logits"]
+
+    mask_logits = logits[0, aa_pos + 1, :]
+    probs = torch.softmax(mask_logits, dim=0)
+
+    if wt not in ALPHABET.standard_toks or mut not in ALPHABET.standard_toks:
+        print(f"[WARN] wt={wt} or mut={mut} not in alphabet")
+        return None
+
+    p_wt = probs[ALPHABET.get_idx(wt)].item()
+    p_mut = probs[ALPHABET.get_idx(mut)].item()
+
+    epsilon = 1e-10
+    delta_score = torch.log(torch.tensor(p_mut + epsilon) / torch.tensor(p_wt + epsilon)).item()
+    print(f"[DEBUG] {wt}{aa_pos+1}{mut} delta_score={delta_score:.4f}")
+    return delta_score
 
 # ---------------- Main ----------------
 def main():
@@ -132,10 +141,10 @@ def main():
     args = parser.parse_args()
 
     variants = load_vcf(args.vcf)
-    print(f"[INFO] Loaded {len(variants)} variants from {args.vcf}")
+    print(f"[INFO] Loaded {len(variants)} variants")
 
     annotated = annotate_with_vep(variants)
-    print(f"[INFO] VEP annotation done, {len(annotated)} records")
+    print(f"[INFO] VEP annotation done")
 
     with open(args.out, "w", newline="") as fh:
         w = csv.writer(fh, delimiter="\t")
@@ -160,7 +169,6 @@ def main():
                         tc = t; break
             if not tc and protein_tcs:
                 tc = protein_tcs[0]
-
             if not tc:
                 w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
                 continue
@@ -189,7 +197,7 @@ def main():
             try:
                 delta = compute_delta_score(seq, aa_pos, parsed["ref"], parsed["alt"])
             except Exception as e:
-                print(f"[DEBUG] delta_score failed: {e}", file=sys.stderr)
+                print(f"[WARN] delta_score failed: {e}", file=sys.stderr)
                 delta = None
 
             w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], delta])
