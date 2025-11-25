@@ -13,7 +13,7 @@ from alphagenome.models import variant_scorers
 API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
 
-def rsid_to_variant_info(rsid, genome_build="hg19"):
+def rsid_to_variant_info(rsid, genome_build="hg38"):
     """
     输入 rsID，返回:
     chromosome='chr22', position=36201698, reference_bases='A', alternate_bases='C'
