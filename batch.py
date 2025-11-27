@@ -36,12 +36,13 @@ def main(vcf_path, output_csv="results.csv"):
     print(f"[INFO] 共找到 {len(variants)} 个变异")
 
     # ---------------- 只创建一次 dna_model ----------------
-    dna_model = dna_client.create(API_KEY)
+    
 
     results = []
     for chrom, pos, ref, alt in variants:
         print(f"[RUN] 处理 {chrom}:{pos} ...")
         try:
+            dna_model = dna_client.create(API_KEY)
             delta_df = score_variant(dna_model, chrom, pos, ref, alt)
             delta_scalar = float(abs(delta_df["nonzero_mean"]).mean())
             results.append({
