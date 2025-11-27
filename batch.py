@@ -1,7 +1,7 @@
 import argparse
 import gzip
 import csv
-from main import score_single_variant  # 你的 main.py 文件中函数
+from main import score_variant  # 你的 main.py 文件中函数
 
 def parse_vcf_line(line):
     """
