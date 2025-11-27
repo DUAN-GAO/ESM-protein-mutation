@@ -1,12 +1,9 @@
 import argparse
 import gzip
 import csv
-from main import score_variant, dna_client, API_KEY  # 导入核心函数和 dna_model 创建
+from main import score_variant, dna_client, API_KEY  # 使用上面修改后的 score_variant
 
 def parse_vcf_line(line):
-    """
-    从 VCF 行提取 chrom, pos, ref, alt
-    """
     fields = line.strip().split("\t")
     chrom = fields[0]
     pos = int(fields[1])
@@ -15,9 +12,6 @@ def parse_vcf_line(line):
     return chrom, pos, ref, alt
 
 def load_vcf(vcf_path):
-    """
-    读取 VCF 文件，返回 [(chrom, pos, ref, alt), ...]
-    """
     variants = []
     opener = gzip.open if vcf_path.endswith(".gz") else open
     with opener(vcf_path, "rt") as f:
@@ -25,8 +19,7 @@ def load_vcf(vcf_path):
             if line.startswith("#"):
                 continue
             try:
-                variant = parse_vcf_line(line)
-                variants.append(variant)
+                variants.append(parse_vcf_line(line))
             except Exception as e:
                 print(f"[WARN] 解析行失败: {line.strip()} -> {e}")
     return variants
@@ -36,15 +29,15 @@ def main(vcf_path, output_csv="results.csv"):
     print(f"[INFO] 共找到 {len(variants)} 个变异")
 
     # ---------------- 只创建一次 dna_model ----------------
-    
+    dna_model = dna_client.create(API_KEY)
 
     results = []
     for chrom, pos, ref, alt in variants:
         print(f"[RUN] 处理 {chrom}:{pos} ...")
         try:
-            dna_model = dna_client.create(API_KEY)
-            delta_df = score_variant(dna_model, chrom, pos, ref, alt)
-            delta_scalar = float(abs(delta_df["nonzero_mean"]).mean())
+            tidy_df = score_variant(dna_model, chrom, pos, ref, alt)
+            # 使用 raw_score 替换 nonzero_mean
+            delta_scalar = float(abs(tidy_df["raw_score"]).mean())
             results.append({
                 "chrom": chrom,
                 "pos": pos,

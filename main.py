@@ -6,7 +6,7 @@ API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 # ---------------- 核心函数 ----------------
 def score_variant(dna_model, chrom, pos, ref, alt):
     """
-    输入 dna_model 和变异位点信息，返回 DataFrame (包含 nonzero_mean)
+    输入 dna_model 和变异位点信息，返回 tidy_scores DataFrame
     """
     print(f"[INFO] Scoring {chrom}:{pos} {ref}>{alt}")
 
@@ -18,7 +18,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
         alternate_bases=alt,
     )
 
-    # AlphaGenome 最小窗口 16384bp
+    # 最小窗口 16kb
     interval = variant.reference_interval.resize(16384)
 
     scorer = variant_scorers.CenterMaskScorer(
@@ -34,11 +34,14 @@ def score_variant(dna_model, chrom, pos, ref, alt):
         organism=dna_client.Organism.HOMO_SAPIENS,
     )
 
-    var_df = result[0].var  # DataFrame
-    delta_scalar = float(abs(var_df["nonzero_mean"]).mean())
+    # 使用 tidy_scores 生成最终 Δ-score
+    tidy_df = variant_scorers.tidy_scores([result[0]], match_gene_strand=True)
 
+    # 计算 delta_scalar 使用 raw_score
+    delta_scalar = float(abs(tidy_df["raw_score"]).mean())
     print(f"[OK] 单一 Δ = {delta_scalar}")
-    return var_df  # 返回完整 DataFrame
+
+    return tidy_df  # 返回 tidy_scores DataFrame
 
 # ---------------- 命令行调用 ----------------
 if __name__ == "__main__":
@@ -53,8 +56,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     dna_model = dna_client.create(API_KEY)
-    var_df = score_variant(dna_model, args.chrom, args.pos, args.ref, args.alt)
-    delta_scalar = float(abs(var_df["nonzero_mean"]).mean())
+    tidy_df = score_variant(dna_model, args.chrom, args.pos, args.ref, args.alt)
+    delta_scalar = float(abs(tidy_df["raw_score"]).mean())
 
     # 输出 TXT 或 CSV
     if args.out:
