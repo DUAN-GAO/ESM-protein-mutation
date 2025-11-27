@@ -1,8 +1,7 @@
 import argparse
 import gzip
 import csv
-from main import score_variant  # main.py 中函数
-from main import dna_client, API_KEY  # 避免每次重新创建模型
+from main import score_variant, dna_client, API_KEY  # 导入核心函数和 dna_model 创建
 
 def parse_vcf_line(line):
     """
@@ -44,10 +43,8 @@ def main(vcf_path, output_csv="results.csv"):
     for rsid, chrom, pos, ref, alt in variants:
         print(f"[RUN] 处理 {rsid} ...")
         try:
-            # 调用 main.py 中的 score_variant，并传入 dna_model
             delta_df = score_variant(dna_model, rsid, chrom, pos, ref, alt)
-            # delta_df 是 DataFrame，取 nonzero_mean 列平均值作为单一评分
-            delta_scalar = float(delta_df["nonzero_mean"].mean())
+            delta_scalar = float(abs(delta_df["nonzero_mean"]).mean())
             results.append({
                 "rsid": rsid,
                 "chrom": chrom,
@@ -67,7 +64,6 @@ def main(vcf_path, output_csv="results.csv"):
             writer.writerow(row)
 
     print(f"[DONE] 结果已保存到 {output_csv}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="批量处理 VCF 并调用 AlphaGenome scoring")

@@ -6,7 +6,7 @@ API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 # ---------------- 核心函数 ----------------
 def score_variant(dna_model, rsid, chrom, pos, ref, alt):
     """
-    输入 rsID 和变异位点信息，返回 delta DataFrame
+    输入 dna_model 和 rsID + 变异位点信息，返回 DataFrame (包含 nonzero_mean)
     """
     print(f"[INFO] Scoring {rsid}: {chrom}:{pos} {ref}>{alt}")
 
@@ -18,7 +18,7 @@ def score_variant(dna_model, rsid, chrom, pos, ref, alt):
         alternate_bases=alt,
     )
 
-    # AlphaGenome 支持的最小窗口 16384bp
+    # AlphaGenome 最小窗口 16384bp
     interval = variant.reference_interval.resize(16384)
 
     scorer = variant_scorers.CenterMaskScorer(
@@ -34,9 +34,11 @@ def score_variant(dna_model, rsid, chrom, pos, ref, alt):
         organism=dna_client.Organism.HOMO_SAPIENS,
     )
 
-    var_df = result[0].var  # DataFrame 输出
-    print(f"[OK] {rsid} Δ matrix obtained ({len(var_df)} rows)")
-    return var_df
+    var_df = result[0].var  # DataFrame
+    delta_scalar = float(abs(var_df["nonzero_mean"]).mean())
+
+    print(f"[OK] {rsid} 单一 Δ = {delta_scalar}")
+    return var_df  # 返回完整 DataFrame，batch.py 中取 nonzero_mean.mean()
 
 # ---------------- 命令行调用 ----------------
 if __name__ == "__main__":
@@ -51,10 +53,9 @@ if __name__ == "__main__":
     parser.add_argument("--out", default=None, help="可选输出 CSV 文件")
     args = parser.parse_args()
 
-    # 直接创建模型
     dna_model = dna_client.create(API_KEY)
     var_df = score_variant(dna_model, args.rsid, args.chrom, args.pos, args.ref, args.alt)
-    delta_scalar = float(var_df["nonzero_mean"].mean())
+    delta_scalar = float(abs(var_df["nonzero_mean"]).mean())
 
     # 输出 TXT 或 CSV
     if args.out:
