@@ -1,0 +1,256 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##FILTER=<ID=RefCall,Description="Genotyping model thinks this site is reference.">
+##FILTER=<ID=LowQual,Description="Confidence in this variant being real is below calling threshold.">
+##FILTER=<ID=NoCall,Description="Site has depth=0 resulting in no call.">
+##FILTER=<ID=GERMLINE,Description="Non somatic variants">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position (for use with symbolic alleles)">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Conditional genotype quality">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
+##FORMAT=<ID=MIN_DP,Number=1,Type=Integer,Description="Minimum DP observed within the GVCF block.">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Read depth for each allele">
+##FORMAT=<ID=VAF,Number=A,Type=Float,Description="Variant allele fractions.">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Phred-scaled genotype likelihoods rounded to the closest integer">
+##FORMAT=<ID=MF,Number=R,Type=Float,Description="Methylation fraction for each of the reference and alternate allele">
+##FORMAT=<ID=MD,Number=R,Type=Integer,Description="Methylation depth for each of the reference and alternate allele">
+##FORMAT=<ID=MT,Number=1,Type=String,Description="Methylation type: 0/0=Unmethylated, 0/1=Heterozygous, 1/1=Methylated">
+##FORMAT=<ID=MED_DP,Number=1,Type=Integer,Description="Median DP observed within the GVCF block rounded to the nearest integer.">
+##DeepVariant_version=1.9.0
+##contig=<ID=chr1,length=248956422>
+##contig=<ID=chr2,length=242193529>
+##contig=<ID=chr3,length=198295559>
+##contig=<ID=chr4,length=190214555>
+##contig=<ID=chr5,length=181538259>
+##contig=<ID=chr6,length=170805979>
+##contig=<ID=chr7,length=159345973>
+##contig=<ID=chr8,length=145138636>
+##contig=<ID=chr9,length=138394717>
+##contig=<ID=chr10,length=133797422>
+##contig=<ID=chr11,length=135086622>
+##contig=<ID=chr12,length=133275309>
+##contig=<ID=chr13,length=114364328>
+##contig=<ID=chr14,length=107043718>
+##contig=<ID=chr15,length=101991189>
+##contig=<ID=chr16,length=90338345>
+##contig=<ID=chr17,length=83257441>
+##contig=<ID=chr18,length=80373285>
+##contig=<ID=chr19,length=58617616>
+##contig=<ID=chr20,length=64444167>
+##contig=<ID=chr21,length=46709983>
+##contig=<ID=chr22,length=50818468>
+##contig=<ID=chrX,length=156040895>
+##contig=<ID=chrM,length=16569>
+##contig=<ID=chr1_KI270706v1_random,length=175055>
+##contig=<ID=chr1_KI270707v1_random,length=32032>
+##contig=<ID=chr1_KI270708v1_random,length=127682>
+##contig=<ID=chr1_KI270709v1_random,length=66860>
+##contig=<ID=chr1_KI270710v1_random,length=40176>
+##contig=<ID=chr1_KI270711v1_random,length=42210>
+##contig=<ID=chr1_KI270712v1_random,length=176043>
+##contig=<ID=chr1_KI270713v1_random,length=40745>
+##contig=<ID=chr1_KI270714v1_random,length=41717>
+##contig=<ID=chr2_KI270715v1_random,length=161471>
+##contig=<ID=chr2_KI270716v1_random,length=153799>
+##contig=<ID=chr3_GL000221v1_random,length=155397>
+##contig=<ID=chr4_GL000008v2_random,length=209709>
+##contig=<ID=chr5_GL000208v1_random,length=92689>
+##contig=<ID=chr9_KI270717v1_random,length=40062>
+##contig=<ID=chr9_KI270718v1_random,length=38054>
+##contig=<ID=chr9_KI270719v1_random,length=176845>
+##contig=<ID=chr9_KI270720v1_random,length=39050>
+##contig=<ID=chr11_KI270721v1_random,length=100316>
+##contig=<ID=chr14_GL000009v2_random,length=201709>
+##contig=<ID=chr14_GL000225v1_random,length=211173>
+##contig=<ID=chr14_KI270722v1_random,length=194050>
+##contig=<ID=chr14_GL000194v1_random,length=191469>
+##contig=<ID=chr14_KI270723v1_random,length=38115>
+##contig=<ID=chr14_KI270724v1_random,length=39555>
+##contig=<ID=chr14_KI270725v1_random,length=172810>
+##contig=<ID=chr14_KI270726v1_random,length=43739>
+##contig=<ID=chr15_KI270727v1_random,length=448248>
+##contig=<ID=chr16_KI270728v1_random,length=1872759>
+##contig=<ID=chr17_GL000205v2_random,length=185591>
+##contig=<ID=chr17_KI270729v1_random,length=280839>
+##contig=<ID=chr17_KI270730v1_random,length=112551>
+##contig=<ID=chr22_KI270731v1_random,length=150754>
+##contig=<ID=chr22_KI270732v1_random,length=41543>
+##contig=<ID=chr22_KI270733v1_random,length=179772>
+##contig=<ID=chr22_KI270734v1_random,length=165050>
+##contig=<ID=chr22_KI270735v1_random,length=42811>
+##contig=<ID=chr22_KI270736v1_random,length=181920>
+##contig=<ID=chr22_KI270737v1_random,length=103838>
+##contig=<ID=chr22_KI270738v1_random,length=99375>
+##contig=<ID=chr22_KI270739v1_random,length=73985>
+##contig=<ID=chrUn_KI270302v1,length=2274>
+##contig=<ID=chrUn_KI270304v1,length=2165>
+##contig=<ID=chrUn_KI270303v1,length=1942>
+##contig=<ID=chrUn_KI270305v1,length=1472>
+##contig=<ID=chrUn_KI270322v1,length=21476>
+##contig=<ID=chrUn_KI270320v1,length=4416>
+##contig=<ID=chrUn_KI270310v1,length=1201>
+##contig=<ID=chrUn_KI270316v1,length=1444>
+##contig=<ID=chrUn_KI270315v1,length=2276>
+##contig=<ID=chrUn_KI270312v1,length=998>
+##contig=<ID=chrUn_KI270311v1,length=12399>
+##contig=<ID=chrUn_KI270317v1,length=37690>
+##contig=<ID=chrUn_KI270412v1,length=1179>
+##contig=<ID=chrUn_KI270411v1,length=2646>
+##contig=<ID=chrUn_KI270414v1,length=2489>
+##contig=<ID=chrUn_KI270419v1,length=1029>
+##contig=<ID=chrUn_KI270418v1,length=2145>
+##contig=<ID=chrUn_KI270420v1,length=2321>
+##contig=<ID=chrUn_KI270424v1,length=2140>
+##contig=<ID=chrUn_KI270417v1,length=2043>
+##contig=<ID=chrUn_KI270422v1,length=1445>
+##contig=<ID=chrUn_KI270423v1,length=981>
+##contig=<ID=chrUn_KI270425v1,length=1884>
+##contig=<ID=chrUn_KI270429v1,length=1361>
+##contig=<ID=chrUn_KI270442v1,length=392061>
+##contig=<ID=chrUn_KI270466v1,length=1233>
+##contig=<ID=chrUn_KI270465v1,length=1774>
+##contig=<ID=chrUn_KI270467v1,length=3920>
+##contig=<ID=chrUn_KI270435v1,length=92983>
+##contig=<ID=chrUn_KI270438v1,length=112505>
+##contig=<ID=chrUn_KI270468v1,length=4055>
+##contig=<ID=chrUn_KI270510v1,length=2415>
+##contig=<ID=chrUn_KI270509v1,length=2318>
+##contig=<ID=chrUn_KI270518v1,length=2186>
+##contig=<ID=chrUn_KI270508v1,length=1951>
+##contig=<ID=chrUn_KI270516v1,length=1300>
+##contig=<ID=chrUn_KI270512v1,length=22689>
+##contig=<ID=chrUn_KI270519v1,length=138126>
+##contig=<ID=chrUn_KI270522v1,length=5674>
+##contig=<ID=chrUn_KI270511v1,length=8127>
+##contig=<ID=chrUn_KI270515v1,length=6361>
+##contig=<ID=chrUn_KI270507v1,length=5353>
+##contig=<ID=chrUn_KI270517v1,length=3253>
+##contig=<ID=chrUn_KI270529v1,length=1899>
+##contig=<ID=chrUn_KI270528v1,length=2983>
+##contig=<ID=chrUn_KI270530v1,length=2168>
+##contig=<ID=chrUn_KI270539v1,length=993>
+##contig=<ID=chrUn_KI270538v1,length=91309>
+##contig=<ID=chrUn_KI270544v1,length=1202>
+##contig=<ID=chrUn_KI270548v1,length=1599>
+##contig=<ID=chrUn_KI270583v1,length=1400>
+##contig=<ID=chrUn_KI270587v1,length=2969>
+##contig=<ID=chrUn_KI270580v1,length=1553>
+##contig=<ID=chrUn_KI270581v1,length=7046>
+##contig=<ID=chrUn_KI270579v1,length=31033>
+##contig=<ID=chrUn_KI270589v1,length=44474>
+##contig=<ID=chrUn_KI270590v1,length=4685>
+##contig=<ID=chrUn_KI270584v1,length=4513>
+##contig=<ID=chrUn_KI270582v1,length=6504>
+##contig=<ID=chrUn_KI270588v1,length=6158>
+##contig=<ID=chrUn_KI270593v1,length=3041>
+##contig=<ID=chrUn_KI270591v1,length=5796>
+##contig=<ID=chrUn_KI270330v1,length=1652>
+##contig=<ID=chrUn_KI270329v1,length=1040>
+##contig=<ID=chrUn_KI270334v1,length=1368>
+##contig=<ID=chrUn_KI270333v1,length=2699>
+##contig=<ID=chrUn_KI270335v1,length=1048>
+##contig=<ID=chrUn_KI270338v1,length=1428>
+##contig=<ID=chrUn_KI270340v1,length=1428>
+##contig=<ID=chrUn_KI270336v1,length=1026>
+##contig=<ID=chrUn_KI270337v1,length=1121>
+##contig=<ID=chrUn_KI270363v1,length=1803>
+##contig=<ID=chrUn_KI270364v1,length=2855>
+##contig=<ID=chrUn_KI270362v1,length=3530>
+##contig=<ID=chrUn_KI270366v1,length=8320>
+##contig=<ID=chrUn_KI270378v1,length=1048>
+##contig=<ID=chrUn_KI270379v1,length=1045>
+##contig=<ID=chrUn_KI270389v1,length=1298>
+##contig=<ID=chrUn_KI270390v1,length=2387>
+##contig=<ID=chrUn_KI270387v1,length=1537>
+##contig=<ID=chrUn_KI270395v1,length=1143>
+##contig=<ID=chrUn_KI270396v1,length=1880>
+##contig=<ID=chrUn_KI270388v1,length=1216>
+##contig=<ID=chrUn_KI270394v1,length=970>
+##contig=<ID=chrUn_KI270386v1,length=1788>
+##contig=<ID=chrUn_KI270391v1,length=1484>
+##contig=<ID=chrUn_KI270383v1,length=1750>
+##contig=<ID=chrUn_KI270393v1,length=1308>
+##contig=<ID=chrUn_KI270384v1,length=1658>
+##contig=<ID=chrUn_KI270392v1,length=971>
+##contig=<ID=chrUn_KI270381v1,length=1930>
+##contig=<ID=chrUn_KI270385v1,length=990>
+##contig=<ID=chrUn_KI270382v1,length=4215>
+##contig=<ID=chrUn_KI270376v1,length=1136>
+##contig=<ID=chrUn_KI270374v1,length=2656>
+##contig=<ID=chrUn_KI270372v1,length=1650>
+##contig=<ID=chrUn_KI270373v1,length=1451>
+##contig=<ID=chrUn_KI270375v1,length=2378>
+##contig=<ID=chrUn_KI270371v1,length=2805>
+##contig=<ID=chrUn_KI270448v1,length=7992>
+##contig=<ID=chrUn_KI270521v1,length=7642>
+##contig=<ID=chrUn_GL000195v1,length=182896>
+##contig=<ID=chrUn_GL000219v1,length=179198>
+##contig=<ID=chrUn_GL000220v1,length=161802>
+##contig=<ID=chrUn_GL000224v1,length=179693>
+##contig=<ID=chrUn_KI270741v1,length=157432>
+##contig=<ID=chrUn_GL000226v1,length=15008>
+##contig=<ID=chrUn_GL000213v1,length=164239>
+##contig=<ID=chrUn_KI270743v1,length=210658>
+##contig=<ID=chrUn_KI270744v1,length=168472>
+##contig=<ID=chrUn_KI270745v1,length=41891>
+##contig=<ID=chrUn_KI270746v1,length=66486>
+##contig=<ID=chrUn_KI270747v1,length=198735>
+##contig=<ID=chrUn_KI270748v1,length=93321>
+##contig=<ID=chrUn_KI270749v1,length=158759>
+##contig=<ID=chrUn_KI270750v1,length=148850>
+##contig=<ID=chrUn_KI270751v1,length=150742>
+##contig=<ID=chrUn_KI270752v1,length=27745>
+##contig=<ID=chrUn_KI270753v1,length=62944>
+##contig=<ID=chrUn_KI270754v1,length=40191>
+##contig=<ID=chrUn_KI270755v1,length=36723>
+##contig=<ID=chrUn_KI270756v1,length=79590>
+##contig=<ID=chrUn_KI270757v1,length=71251>
+##contig=<ID=chrUn_GL000214v1,length=137718>
+##contig=<ID=chrUn_KI270742v1,length=186739>
+##contig=<ID=chrUn_GL000216v2,length=176608>
+##contig=<ID=chrUn_GL000218v1,length=161147>
+##contig=<ID=chrEBV,length=171823>
+##bcftools_viewVersion=1.15.1+htslib-1.21
+##bcftools_viewCommand=view -f PASS -Oz -o deepvariant_BLOOD_iPSC/BLOOD_iPSC_deepsomatic.PASS.vcf.gz deepvariant_BLOOD_iPSC/BLOOD_iPSC_deepsomatic.vcf.gz; Date=Tue Nov 11 13:13:46 2025
+##bcftools_concatVersion=1.17+htslib-1.17
+##bcftools_concatCommand=concat -a -f vcf.list; Date=Tue Nov 11 16:30:20 2025
+##bcftools_pluginVersion=1.17+htslib-1.17
+##bcftools_pluginCommand=plugin setGT -- -t q -n c:0/1 -i FMT/GT="1/1"; Date=Tue Nov 11 16:30:20 2025
+##HiPhase_version="1.5.0-8af3f1e"
+##HiPhase_command="hiphase --bam /mnt/miniwdl_task_container/work/_miniwdl_inputs/0/iPSC.movie.bam -t 24 --output-bam iPSC.movie.hiphase.bam --vcf /mnt/miniwdl_task_container/work/_miniwdl_inputs/0/BLOOD_iPSC.tumor.clair3.small_variantscorrect_ref.vcf.gz --output-vcf BLOOD_iPSC.tumor.clair3.small_variantscorrect_ref.hiphase.vcf.gz --vcf /mnt/miniwdl_task_container/work/_miniwdl_inputs/0/BLOOD_iPSC_deepsomatic.vcf.gz --output-vcf BLOOD_iPSC_deepsomatic.hiphase.vcf.gz -r /mnt/miniwdl_task_container/work/_miniwdl_inputs/0/hg38.noY.fa --stats-file iPSC.movie.hiphase.stats --summary-file iPSC.movie.hiphase.summary.tsv --blocks-file iPSC.movie.hiphase.blocks.tsv --ignore-read-groups"
+##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phase set identifier">
+##FORMAT=<ID=PF,Number=1,Type=String,Description="Phasing flag">
+##bcftools_viewVersion=1.17+htslib-1.17
+##bcftools_viewCommand=view /mnt/miniwdl_task_container/work/_miniwdl_inputs/0/BLOOD_iPSC_deepsomatic.hiphase.vcf.gz; Date=Tue Nov 11 17:08:31 2025
+##bcftools_normVersion=1.17+htslib-1.17
+##bcftools_normCommand=norm --threads 63 --multiallelics - --output-type b --fasta-ref /mnt/miniwdl_task_container/work/_miniwdl_inputs/0/hg38.noY.fa; Date=Tue Nov 11 17:08:31 2025
+##VEP="v112.0" API="v112" time="2025-11-11 17:12:07" cache="vep_data/homo_sapiens_refseq/112_GRCh38" ensembl=112.7104005 ensembl-funcgen=112.be19ffa ensembl-io=112.2851b6f ensembl-variation=112.4113356 1000genomes="phase3" COSMIC="98" ClinVar="202310" HGMD-PUBLIC="20204" assembly="GRCh38.p14" dbSNP="156" gencode="GENCODE 46" genebuild="2014-07" gnomADe="r2.1.1" gnomADg="v3.1.2" polyphen="2.2.3" refseq="GCF_000001405.40-RS_2023_10 - GCF_000001405.40_GRCh38.p14_genomic.gff" regbuild="1.0" sift="6.2.1"
+##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|DISTANCE|STRAND|FLAGS|PICK|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|UNIPROT_ISOFORM|REFSEQ_MATCH|REFSEQ_OFFSET|GIVEN_REF|USED_REF|BAM_EDIT|GENE_PHENO|SIFT|PolyPhen|DOMAINS|miRNA|HGVS_OFFSET|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomADe_AF|gnomADe_AFR_AF|gnomADe_AMR_AF|gnomADe_ASJ_AF|gnomADe_EAS_AF|gnomADe_FIN_AF|gnomADe_NFE_AF|gnomADe_OTH_AF|gnomADe_SAS_AF|gnomADg_AF|gnomADg_AFR_AF|gnomADg_AMI_AF|gnomADg_AMR_AF|gnomADg_ASJ_AF|gnomADg_EAS_AF|gnomADg_FIN_AF|gnomADg_MID_AF|gnomADg_NFE_AF|gnomADg_OTH_AF|gnomADg_SAS_AF|MAX_AF|MAX_AF_POPS|CLIN_SIG|SOMATIC|PHENO|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS">
+##VEP-command-line='vep --assembly GRCh38 --cache --check_existing --compress_output bgzip --database 0 --dir vep_data/ --dir_plugins /plugins --everything --fasta [PATH]/hg38.noY.fa --flag_pick_allele_gene --fork 8 --format vcf --hgvs --input_file [PATH]/BLOOD_iPSC_deepsomatic.hiphase.norm.vcf.gz --offline --output_file BLOOD_iPSC_deepsomatic.hiphase.norm.vep.vcf.gz --pick --refseq --symbol --vcf'
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	BLOOD_iPSC.tumor
+chr1	152216796	.	G	A	6.8	PASS	CSQ=A|synonymous_variant|LOW|HRNR|388697|Transcript|NM_001009931.3|protein_coding|3/3||NM_001009931.3:c.4833C>T|NP_001009931.1:p.Tyr1611%3D|4909|4833|1611|Y|taC/taT|rs1437007078||-1|||SNV|EntrezGene||YES|ENST00000368801.4|||||NP_001009931.1|||||||G|G||||||||||||||0.006511|0.008557|0.006115|0.01084|0.003479|0.003891|0.007018|0.005165|0.006571|0.01621|0.01668|0.004545|0.02652|0.01738|0.002187|0.02892|0|0.01512|0.01417|0.01141|0.02892|gnomADg_FIN|||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:3:29:22,7:0.241379:3,1,0:152213946
+chr1	152217304	.	C	T	4.5	PASS	CSQ=T|missense_variant|MODERATE|HRNR|388697|Transcript|NM_001009931.3|protein_coding|3/3||NM_001009931.3:c.4325G>A|NP_001009931.1:p.Arg1442Gln|4401|4325|1442|R/Q|cGa/cAa|rs368528146&COSV64261074||-1|||SNV|EntrezGene||YES|ENST00000368801.4|||||NP_001009931.1|||||||C|C|||tolerated(1)|unknown(0)||||||||||0.1282|0.01154|0.2062|0.275|0.2526|0.2931|0.3085|0.2025|0.3678|0|0||0|||||0|0|0|0.3678|gnomADe_SAS||0&1|0&1||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:2:29:23,6:0.206897:0,2,0:152213946
+chr1	152218176	.	A	G	12.6	PASS	CSQ=G|synonymous_variant|LOW|HRNR|388697|Transcript|NM_001009931.3|protein_coding|3/3||NM_001009931.3:c.3453T>C|NP_001009931.1:p.Ser1151%3D|3529|3453|1151|S|tcT/tcC|rs200579715||-1|||SNV|EntrezGene||YES|ENST00000368801.4|||||NP_001009931.1|||||||A|A||||||||||||||0.0001688|0.0001846|0.000175|0|0.0003728|0|4.364e-05|0|0.0004309|0.0001438|7.538e-05|0|0.000284|0|0.000283|0.0001366|0|0.0001623|0|0|0.0004309|gnomADe_SAS|||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:12:39:35,4:0.102564:12,23,0:152213946
+chr1	152218392	.	G	A	5.7	PASS	CSQ=A|synonymous_variant|LOW|HRNR|388697|Transcript|NM_001009931.3|protein_coding|3/3||NM_001009931.3:c.3237C>T|NP_001009931.1:p.His1079%3D|3313|3237|1079|H|caC/caT|rs376727785&COSV64254055||-1|||SNV|EntrezGene||YES|ENST00000368801.4|||||NP_001009931.1|||||||G|G||||||||||||||0.0007938|0.006369|0.0005213|0.0006983|0.0004358|4.623e-05|0.0003348|0.000653|0.0006885|0.0133|0.04589|0|0.005773|0.002023|0.00117|0.001041|0|0.00192|0.008858|0.002091|0.04589|gnomADg_AFR||0&1|0&1||||||	GT:GQ:DP:AD:VAF:PL	0/1:4:39:35,4:0.102564:3,8,0
+chr1	212016974	.	G	A	9.8	PASS	CSQ=A|missense_variant|MODERATE|INTS7|25896|Transcript|NM_015434.4|protein_coding|4/20||NM_015434.4:c.421C>T|NP_056249.1:p.His141Tyr|541|421|141|H/Y|Cat/Tat|COSV100877457||-1|||SNV|EntrezGene||YES|ENST00000366994.8|||||NP_056249.1|||||||G|G|||deleterious(0)|probably_damaging(0.98)|||||||||||||||||||||||||||||||||1|1||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:10:43:40,3:0.0697674:9,47,0:212014465
+chr2	94208461	.	C	T	25.1	PASS	CSQ=T|synonymous_variant|LOW|LOC107985915|107985915|Transcript|XM_047446873.1|protein_coding|2/5||XM_047446873.1:c.267C>T|XP_047302829.1:p.Val89%3D|267|267|89|V|gtC/gtT|rs1283642145||1|||SNV|EntrezGene||YES||||||XP_047302829.1|||||||C|C|||||||||||||||||||||||0.000669|0.001551|0|0.0006628|0|0.0002473|0.0001101|0|0.0004833|0|0|0.001551|gnomADg_AFR|||||||||	GT:GQ:DP:AD:VAF:PL	0/1:25:80:68,12:0.15:25,46,0
+chr3	195784271	.	T	C	5.4	PASS	CSQ=C|missense_variant|MODERATE|MUC4|4585|Transcript|NM_018406.7|protein_coding|2/25||NM_018406.7:c.7309A>G|NP_060876.5:p.Asn2437Asp|7421|7309|2437|N/D|Aac/Gac|rs430037&COSV62126847||-1|||SNV|EntrezGene||YES|ENST00000463781.8|||||NP_060876.5|||||||T|T|||tolerated_low_confidence(0.93)|benign(0.301)||||0.5473|0.4629|0.4841|0.75|0.5755|0.4683|0.3321|0.2805|0.3119|0.3836|0.4504|0.3697|0.3177|0.3172|0.3059|0.3388|0.309|0.4039|0.3221|0.3998|0.448|0.3824|0.3168|0.3401|0.3392|0.3278|0.75|EAS||0&1|0&1||||||	GT:GQ:DP:AD:VAF:PL	0/1:3:35:27,8:0.228571:2,2,0
+chr5	1858284	.	G	C	8.5	PASS	CSQ=C|missense_variant|MODERATE|LOC124901163|124901163|Transcript|XM_047418001.1|protein_coding|1/1||XM_047418001.1:c.757G>C|XP_047273957.1:p.Glu253Gln|1013|757|253|E/Q|Gaa/Caa|rs113870110||1|||SNV|EntrezGene||YES||||||XP_047273957.1|||||||G|G|||||||||||||||||||||||0.03015|0.08216|0.03333|0.04605|0.01295|0.01583|0.0304|0|0.01961|0.01515|0.03179|0.08216|gnomADg_AFR|||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:8:24:20,4:0.166667:7,31,0:1802916
+chr5	148112906	.	G	T	46.3	PASS	CSQ=T|missense_variant|MODERATE|SPINK5|11005|Transcript|NM_006846.4|protein_coding|20/33||NM_006846.4:c.1859G>T|NP_006837.2:p.Arg620Ile|1924|1859|620|R/I|aGa/aTa|||1|||SNV|EntrezGene||YES|ENST00000256084.8|||||NP_006837.2|||||||G|G|||deleterious(0.03)|probably_damaging(0.964)||||||||||||||||||||||||||||||||||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:46:75:42,33:0.44:46,59,0:148112906
+chr7	101036851	.	G	A	4.7	PASS	CSQ=A|missense_variant|MODERATE|MUC17|140453|Transcript|NM_001040105.2|protein_coding|3/13||NM_001040105.2:c.5435G>A|NP_001035194.1:p.Ser1812Asn|5490|5435|1812|S/N|aGc/aAc|rs75782138&COSV60280403&COSV60290308||1|||SNV|EntrezGene||YES|ENST00000306151.9|||||NP_001035194.1|||||||G|G||||unknown(0)||||0.0795|0.0325|0.0144|0.1736|0.004|0.1697|0.04074|0.0299|0.05152|9.929e-05|0.157|0.02981|0.001663|0.02561|0.134|0.02313|0.02944|0|0.01761|0|0.1658|0.02841|0.009494|0.001367|0.02483|0.1508|0.1736|EAS||0&1&1|0&1&1||||||	GT:GQ:DP:AD:VAF:PL	0/1:4:49:40,9:0.183673:2,9,0
+chr9	7046901	.	C	G	12.7	PASS	CSQ=G|missense_variant|MODERATE|KDM4C|23081|Transcript|NM_015061.6|protein_coding|16/22||NM_015061.6:c.2299C>G|NP_055876.2:p.Gln767Glu|2547|2299|767|Q/E|Caa/Gaa|rs1407856&COSV67186826||1|||SNV|EntrezGene||YES|ENST00000381309.8|||||NP_055876.2|||||||C|C|||tolerated(0.3)|benign(0.005)||||0.2250|0.025|0.2723|0.2937|0.171|0.4468|0.2188|0.04731|0.3452|0.1525|0.2767|0.1211|0.1759|0.1928|0.3889|0.1574|0.05592|0.2237|0.2716|0.1529|0.2664|0.1144|0.1234|0.1744|0.16|0.3985|0.4468|SAS||0&1|0&1|20158306|||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:8:45:34,11:0.244444:11,8,0:5709819
+chr9	87650042	.	C	A	38	PASS	CSQ=A|missense_variant|MODERATE|DAPK1|1612|Transcript|NM_004938.4|protein_coding|16/26||NM_004938.4:c.1550C>A|NP_004929.2:p.Thr517Lys|1899|1550|517|T/K|aCa/aAa|||1|||SNV|EntrezGene||YES|ENST00000408954.8|||||NP_004929.2|||||||C|C|||deleterious(0.03)|probably_damaging(0.987)||||||||||||||||||||||||||||||||||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:38:53:28,25:0.471698:38,48,0:87562645
+chr10	84232241	.	C	T	41.5	PASS	CSQ=T|missense_variant|MODERATE|LRIT1|26103|Transcript|NM_015613.3|protein_coding|4/4||NM_015613.3:c.1558G>A|NP_056428.1:p.Asp520Asn|1665|1558|520|D/N|Gat/Aat|rs1359984056||-1|||SNV|EntrezGene||YES|ENST00000372105.4|||||NP_056428.1|||||||C|C|||tolerated(0.2)|benign(0.234)|||||||||||||||||||6.569e-06|2.412e-05|0|0|0|0|0|0|0|0|0|2.412e-05|gnomADg_AFR|||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:41:48:27,21:0.4375:41,53,0:84083196
+chr10	99877285	.	C	T	44.7	PASS	CSQ=T|missense_variant|MODERATE|DNMBP|23268|Transcript|NM_015221.4|protein_coding|17/17||NM_015221.4:c.4600G>A|NP_056036.1:p.Val1534Met|4720|4600|1534|V/M|Gtg/Atg|rs377547949||-1|||SNV|EntrezGene||YES|ENST00000324109.9|||||NP_056036.1|||||||C|C|||deleterious_low_confidence(0)|probably_damaging(0.997)||||||||||3.185e-05|0.0001231|8.712e-05|0|0|0|1.759e-05|0|3.271e-05|3.288e-05|7.244e-05|0|0|0|0|0|0|1.47e-05|0|0.0002078|0.0002078|gnomADg_SAS|||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:43:41:17,24:0.585366:44,47,0:98572398
+chr11	1099089	.	A	C	4.6	PASS	CSQ=C|missense_variant|MODERATE|MUC2|4583|Transcript|NM_002457.5|protein_coding|39/58||NM_002457.5:c.8836A>C|NP_002448.5:p.Thr2946Pro|8864|8836|2946|T/P|Acg/Ccg|rs12574944||1|||SNV|EntrezGene||YES|ENST00000713550.1|||||NP_002448.5|||||||A|A|||tolerated_low_confidence(0.09)|unknown(0)|||||||||||||||||||0.02611|0.009202|0.05319|0.02036|0.02435|0.001238|0.03378|0.1|0.03938|0.01543|0.01361|0.1|gnomADg_MID|||||||||	GT:GQ:DP:AD:VAF:PL	0/1:4:33:29,4:0.121212:2,14,0
+chr15	58545849	.	A	G	41.9	PASS	CSQ=G|missense_variant|MODERATE|LIPC|3990|Transcript|NM_000236.3|protein_coding|5/9||NM_000236.3:c.682A>G|NP_000227.2:p.Met228Val|724|682|228|M/V|Atg/Gtg|rs767030496||1|||SNV|EntrezGene||YES|ENST00000299022.10|||||NP_000227.2|||||||A|A|||deleterious(0.03)|benign(0.078)||||||||||2.783e-05|0|0|0|0.0003806|0|0|0|0|6.571e-06|0|0|0|0|0|0|0|1.47e-05|0|0|0.0003806|gnomADe_EAS|||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:42:50:27,22:0.44:41,57,0:58359734
+chr19	22392239	.	G	T	44.9	PASS	CSQ=T|missense_variant|MODERATE|ZNF98|148198|Transcript|NM_001098626.2|protein_coding|4/4||NM_001098626.2:c.996C>A|NP_001092096.1:p.Ser332Arg|1118|996|332|S/R|agC/agA|rs1220393520||-1|||SNV|EntrezGene||YES|ENST00000357774.9|||||NP_001092096.1|||||||G|G|||tolerated_low_confidence(0.16)|benign(0.007)||||||||||||||||||||||||||||||||||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:45:44:20,24:0.545455:44,59,0:21867488
+chr19	35371879	.	T	C	3.3	PASS	CSQ=C|missense_variant|MODERATE|GPR42|2866|Transcript|NM_001348195.2|protein_coding|2/2||NM_001348195.2:c.520T>C|NP_001335124.1:p.Trp174Arg|582|520|174|W/R|Tgg/Cgg|rs424241&COSV71995080||1|||SNV|EntrezGene||YES|ENST00000454971.3|||||NP_001335124.1|||||||T|T|||tolerated(0.78)|benign(0)||||0.2796|0.2897|0.1816|0.5526|0.16|0.1769|0.1581|0.3908|0.1887|0.05435|0.6847|0.01706|0.1001|0.1675|0.1224|0.011|0.02943|0.006897|0.009873|0.008966|0.05224|0.001429|0.02055|0.004694|0.01415|0.02979|0.6847|gnomADe_EAS||0&1|0&1||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:3:31:29,2:0.0645161:0,17,0:34800586
+chr19	49033133	.	C	A	4.9	PASS	CSQ=A|missense_variant|MODERATE|CGB2|114336|Transcript|NM_033378.2|protein_coding|3/3||NM_033378.2:c.404C>A|NP_203696.2:p.Ala135Asp|610|404|135|A/D|gCc/gAc|rs62126039&COSV56818904||1|||SNV|EntrezGene||YES|ENST00000359342.7|||||NP_203696.2|||||||C|C|||tolerated(0.26)|benign(0.003)||||0.2957|0.3381|0.3718|0.1567|0.336|0.2863|0.2271|0.2498|0.2916|0.2052|0.1083|0.2151|0.2412|0.246|0.1883|0.3137|0.3087|0.336|0.3768|0.3464|0.1498|0.2523|0.3065|0.3255|0.3199|0.2747|0.3768|gnomADg_AMR|benign|0&1|1&1||||||	GT:GQ:DP:AD:VAF:PL	0/1:5:20:18,2:0.1:3,25,0
+chr19	54222457	.	T	C	8	PASS	CSQ=C|missense_variant|MODERATE|LILRB3|11025|Transcript|NM_006864.4|protein_coding|3/13||NM_006864.4:c.176A>G|NP_006855.3:p.Gln59Arg|207|176|59|Q/R|cAa/cGa|rs200199363||-1|||SNV|EntrezGene||YES|ENST00000445347.2|||||NP_006855.3|||||||T|T|||tolerated(1)|benign(0)|||||||||||||||||||0.2724|0.1547|0.3084|0.3652|0.2004|0.5725|0.2752|0.308|0.3047|0.2796|0.2904|0.5725|gnomADg_EAS|||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:3:18:13,5:0.277778:5,2,0:53947054
+chr21	44592010	.	C	T	7.1	PASS	CSQ=T|missense_variant|MODERATE|KRTAP10-6|386674|Transcript|NM_198688.3|protein_coding|1/1||NM_198688.3:c.475G>A|NP_941961.3:p.Val159Ile|496|475|159|V/I|Gtc/Atc|rs233306&COSV59952960||-1|||SNV|EntrezGene||YES|ENST00000400368.1|||||NP_941961.3|||||||C|C|||tolerated(0.16)|unknown(0)||||||||||0.0132|0.04758|0.006015|0.01488|0.0338|0.005079|0.01052|0.01442|0.008808|0.1277|0.2161|0.1656|0.08525|0.1213|0.1341|0.08121|0.1154|0.1016|0.1159|0.08293|0.2161|gnomADg_AFR||0&1|0&1||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:7:37:34,3:0.0810811:6,32,0:44469031
+chr22	20359368	.	A	G	24.8	PASS	CSQ=G|synonymous_variant|LOW|LOC124905153|124905153|Transcript|XM_047441699.1|protein_coding|4/4||XM_047441699.1:c.4644A>G|XP_047297655.1:p.Pro1548%3D|4644|4644|1548|P|ccA/ccG|rs375150410||1|||SNV|EntrezGene||YES||||||XP_047297655.1|||||||A|A|||||||||||||||||||||||0.3691|0.419|0.2659|0.3963|0.3512|0.4406|0.3061|0.3857|0.3302|0.359|0.4176|0.4406|gnomADg_EAS|||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:25:37:28,9:0.243243:24,37,0:20322832
+chr22	20359386	.	C	G	12.5	PASS	CSQ=G|synonymous_variant|LOW|LOC124905153|124905153|Transcript|XM_047441699.1|protein_coding|4/4||XM_047441699.1:c.4662C>G|XP_047297655.1:p.Pro1554%3D|4662|4662|1554|P|ccC/ccG|rs62218248||1|||SNV|EntrezGene||YES||||||XP_047297655.1|||||||C|C|||||||||||||||||||||||0.6658|0.6102|0.7168|0.6432|0.6601|0.5341|0.7039|0.6111|0.707|0.6639|0.5927|0.7168|gnomADg_AMI|||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:12:36:28,8:0.222222:12,24,0:20322832
+chr22	24178084	.	A	G	46.7	PASS	CSQ=G|missense_variant|MODERATE|CABIN1|23523|Transcript|NM_012295.4|protein_coding|37/37||NM_012295.4:c.6551A>G|NP_036427.1:p.Asn2184Ser|6689|6551|2184|N/S|aAc/aGc|rs779534609||1|||SNV|EntrezGene||YES|ENST00000263119.10|||||NP_036427.1|||||||A|A|||deleterious_low_confidence(0.01)|benign(0.194)||||||||||6.774e-05|0|0|0|0|0|3.53e-05|0|0.0004246|1.972e-05|0|0|0|0|0|0|0|2.941e-05|0|0.000207|0.0004246|gnomADe_SAS|||||||||	GT:GQ:DP:AD:VAF:PL:PS	1|0:46:36:14,22:0.611111:46,52,0:24172041
+chrX	40074676	.	G	A	43.2	PASS	CSQ=A|stop_gained|HIGH|BCOR|54880|Transcript|NM_001123385.2|protein_coding|4/15||NM_001123385.2:c.670C>T|NP_001116857.1:p.Gln224Ter|1454|670|224|Q/*|Cag/Tag|rs2147265622&COSV60706038||-1|||SNV|EntrezGene||YES|ENST00000378444.9|||||NP_001116857.1|||||||G|G|||||||||||||||||||||||||||||||||||||0&1|0&1||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:43:42:23,19:0.452381:43,63,0:39924989
+chrX	50069964	.	C	T	39	PASS	CSQ=T|synonymous_variant|LOW|CLCN5|1184|Transcript|NM_001127898.4|protein_coding|5/15||NM_001127898.4:c.249C>T|NP_001121370.1:p.Thr83%3D|650|249|83|T|acC/acT|rs1933167394||1|||SNV|EntrezGene||YES|ENST00000376091.8|||||NP_001121370.1|||||||C|C||||||||||||||||||||||||||||||||||||||||||||	GT:GQ:DP:AD:VAF:PL:PS	0|1:38:47:23,24:0.510638:38,42,0:50061802

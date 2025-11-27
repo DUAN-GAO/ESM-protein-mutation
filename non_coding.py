@@ -52,19 +52,24 @@ def rsid_to_variant_info(rsid, genome_build="hg19"):
         raise ValueError(f"{rsid} 信息不完整")
     return f"chr{chrom}", pos, ref, alt
 
+
+# -------- 修改后的唯一得分版本 --------
 def score_single_variant(dna_model, rsid):
     try:
         chrom, pos, ref, alt = rsid_to_variant_info(rsid)
     except Exception as e:
         print(f"[WARN] 跳过 {rsid}: {e}")
         return None
+
     variant = genome.Variant(chromosome=chrom, position=pos, reference_bases=ref, alternate_bases=alt)
-    interval = variant.reference_interval.resize(2048)
+    interval = variant.reference_interval.resize(16384)  # AlphaGenome要求 >= 16384 bp
+
     scorer = variant_scorers.CenterMaskScorer(
         width=None,
         aggregation_type=variant_scorers.AggregationType.DIFF_SUM_LOG2,
         requested_output=dna_client.OutputType.RNA_SEQ,
     )
+
     try:
         score_result = dna_model.score_variant(
             interval=interval,
@@ -72,10 +77,20 @@ def score_single_variant(dna_model, rsid):
             variant_scorers=[scorer],
             organism=dna_client.Organism.HOMO_SAPIENS,
         )
-        return chrom, pos, ref, alt, score_result[0].var
+
+        var_df = score_result[0].var  # DataFrame
+
+        # 👉 生成单一评分（可改 median/max）
+        delta_scalar = float(abs(var_df["delta"]).mean())
+
+        print(f"[OK] {rsid} 单一 Δ = {delta_scalar}")
+        return chrom, pos, ref, alt, delta_scalar
+
     except Exception as e:
         print(f"[ERROR] {rsid} 评分失败: {e}")
         return None
+# -------- 以上为替换区域 --------
+
 
 def main(vcf_path, output_csv="results.csv"):
     rsids = load_rsids_from_vcf(vcf_path)
