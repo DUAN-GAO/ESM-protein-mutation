@@ -1,24 +1,22 @@
+# ---------- batch.py ----------
+
 import argparse
 import gzip
 import csv
-from main import score_variant  # 你的 main.py 文件中函数
+from main import score_variant  # 直接调用 main.py 函数
+
 
 def parse_vcf_line(line):
-    """
-    从 VCF 行提取 chrom, pos, rsid, ref, alt
-    """
     fields = line.strip().split("\t")
-    chrom = fields[0]
+    chrom = fields[0].replace("chr", "")
     pos = int(fields[1])
-    rsid = fields[2].split("&")[0]  # 清理附加 ID
+    rsid = fields[2].split("&")[0]
     ref = fields[3]
     alt = fields[4]
     return rsid, chrom, pos, ref, alt
 
+
 def load_vcf(vcf_path):
-    """
-    读取 VCF 文件，返回 [(rsid, chrom, pos, ref, alt), ...]
-    """
     variants = []
     opener = gzip.open if vcf_path.endswith(".gz") else open
     with opener(vcf_path, "rt") as f:
@@ -26,39 +24,36 @@ def load_vcf(vcf_path):
             if line.startswith("#"):
                 continue
             try:
-                variant = parse_vcf_line(line)
-                variants.append(variant)
+                variants.append(parse_vcf_line(line))
             except Exception as e:
-                print(f"[WARN] 解析行失败: {line.strip()} -> {e}")
+                print(f"[WARN] 跳过行: {line.strip()} → {e}")
     return variants
+
 
 def main(vcf_path, output_csv="results.csv"):
     variants = load_vcf(vcf_path)
-    print(f"[INFO] 共找到 {len(variants)} 个变异")
+    print(f"[INFO] 共读取 {len(variants)} 条变异记录")
 
     results = []
+
     for rsid, chrom, pos, ref, alt in variants:
-        print(f"[RUN] 处理 {rsid} ...")
-        try:
-            delta = score_variant(rsid, chrom, pos, ref, alt)
-            results.append({"rsid": rsid, "chrom": chrom, "pos": pos, "ref": ref, "alt": alt, "delta_score": delta})
-        except Exception as e:
-            print(f"[WARN] {rsid} 处理失败: {e}")
+        res = score_variant(chrom, pos, ref, alt, rsid)
+        results.append(res)
 
-    # 写入 CSV
+    keys = sorted({k for r in results for k in r.keys()})
+
     with open(output_csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["rsid", "chrom", "pos", "ref", "alt", "delta_score"])
+        writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
-        for row in results:
-            writer.writerow(row)
+        writer.writerows(results)
 
-    print(f"[DONE] 结果已保存到 {output_csv}")
+    print(f"[DONE] 结果已保存：{output_csv}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="批量处理 VCF 并调用 AlphaGenome scoring")
-    parser.add_argument("--vcf", required=True, help="输入 VCF 文件路径 (.vcf 或 .vcf.gz)")
-    parser.add_argument("--out", default="results.csv", help="输出 CSV 文件")
+    parser = argparse.ArgumentParser(description="批量 VCF AlphaGenome 评分")
+    parser.add_argument("--vcf", required=True, help="VCF 文件路径 (.vcf 或 .vcf.gz)")
+    parser.add_argument("--out", default="results.csv", help="输出 CSV 路径")
     args = parser.parse_args()
 
     main(args.vcf, args.out)
