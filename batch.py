@@ -5,19 +5,18 @@ from main import score_variant, dna_client, API_KEY  # 导入核心函数和 dna
 
 def parse_vcf_line(line):
     """
-    从 VCF 行提取 chrom, pos, rsid, ref, alt
+    从 VCF 行提取 chrom, pos, ref, alt
     """
     fields = line.strip().split("\t")
     chrom = fields[0]
     pos = int(fields[1])
-    rsid = fields[2].split("&")[0]  # 清理附加 ID
     ref = fields[3]
     alt = fields[4]
-    return rsid, chrom, pos, ref, alt
+    return chrom, pos, ref, alt
 
 def load_vcf(vcf_path):
     """
-    读取 VCF 文件，返回 [(rsid, chrom, pos, ref, alt), ...]
+    读取 VCF 文件，返回 [(chrom, pos, ref, alt), ...]
     """
     variants = []
     opener = gzip.open if vcf_path.endswith(".gz") else open
@@ -40,13 +39,12 @@ def main(vcf_path, output_csv="results.csv"):
     dna_model = dna_client.create(API_KEY)
 
     results = []
-    for rsid, chrom, pos, ref, alt in variants:
-        print(f"[RUN] 处理 {rsid} ...")
+    for chrom, pos, ref, alt in variants:
+        print(f"[RUN] 处理 {chrom}:{pos} ...")
         try:
-            delta_df = score_variant(dna_model, rsid, chrom, pos, ref, alt)
+            delta_df = score_variant(dna_model, chrom, pos, ref, alt)
             delta_scalar = float(abs(delta_df["nonzero_mean"]).mean())
             results.append({
-                "rsid": rsid,
                 "chrom": chrom,
                 "pos": pos,
                 "ref": ref,
@@ -54,11 +52,11 @@ def main(vcf_path, output_csv="results.csv"):
                 "delta_score": delta_scalar
             })
         except Exception as e:
-            print(f"[WARN] {rsid} 处理失败: {e}")
+            print(f"[WARN] {chrom}:{pos} 处理失败: {e}")
 
     # 写入 CSV
     with open(output_csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["rsid", "chrom", "pos", "ref", "alt", "delta_score"])
+        writer = csv.DictWriter(f, fieldnames=["chrom", "pos", "ref", "alt", "delta_score"])
         writer.writeheader()
         for row in results:
             writer.writerow(row)
