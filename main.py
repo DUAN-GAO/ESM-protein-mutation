@@ -23,7 +23,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
 
     scorer = variant_scorers.CenterMaskScorer(
         width=None,
-        aggregation_type=variant_scorers.AggregationType.DIFF_MAX,
+        aggregation_type=variant_scorers.AggregationType.DIFF_MEAN,
         requested_output=dna_client.OutputType.RNA_SEQ,
     )
 
