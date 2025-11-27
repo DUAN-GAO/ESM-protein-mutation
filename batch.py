@@ -1,7 +1,8 @@
 import argparse
 import gzip
 import csv
-from main import score_variant  # 你的 main.py 文件中函数
+from main import score_variant  # main.py 中函数
+from main import dna_client, API_KEY  # 避免每次重新创建模型
 
 def parse_vcf_line(line):
     """
@@ -36,12 +37,25 @@ def main(vcf_path, output_csv="results.csv"):
     variants = load_vcf(vcf_path)
     print(f"[INFO] 共找到 {len(variants)} 个变异")
 
+    # ---------------- 只创建一次 dna_model ----------------
+    dna_model = dna_client.create(API_KEY)
+
     results = []
     for rsid, chrom, pos, ref, alt in variants:
         print(f"[RUN] 处理 {rsid} ...")
         try:
-            delta = float(score_variant(rsid, chrom, pos, ref, alt)["nonzero_mean"].mean())
-            results.append({"rsid": rsid, "chrom": chrom, "pos": pos, "ref": ref, "alt": alt, "delta_score": delta})
+            # 调用 main.py 中的 score_variant，并传入 dna_model
+            delta_df = score_variant(dna_model, rsid, chrom, pos, ref, alt)
+            # delta_df 是 DataFrame，取 nonzero_mean 列平均值作为单一评分
+            delta_scalar = float(delta_df["nonzero_mean"].mean())
+            results.append({
+                "rsid": rsid,
+                "chrom": chrom,
+                "pos": pos,
+                "ref": ref,
+                "alt": alt,
+                "delta_score": delta_scalar
+            })
         except Exception as e:
             print(f"[WARN] {rsid} 处理失败: {e}")
 

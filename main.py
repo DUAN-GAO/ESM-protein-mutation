@@ -4,14 +4,11 @@ from alphagenome.models import dna_client, variant_scorers
 API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
 # ---------------- 核心函数 ----------------
-def score_variant(rsid, chrom, pos, ref, alt):
+def score_variant(dna_model, rsid, chrom, pos, ref, alt):
     """
-    输入 rsID 和变异位点信息，返回 delta_score
+    输入 rsID 和变异位点信息，返回 delta DataFrame
     """
     print(f"[INFO] Scoring {rsid}: {chrom}:{pos} {ref}>{alt}")
-
-    # 初始化模型
-    dna_model = dna_client.create(API_KEY)
 
     # 创建 Variant 对象
     variant = genome.Variant(
@@ -37,9 +34,9 @@ def score_variant(rsid, chrom, pos, ref, alt):
         organism=dna_client.Organism.HOMO_SAPIENS,
     )
 
-    delta = result[0].var
-    print(f"[OK] {rsid} Δ = {delta}")
-    return delta
+    var_df = result[0].var  # DataFrame 输出
+    print(f"[OK] {rsid} Δ matrix obtained ({len(var_df)} rows)")
+    return var_df
 
 # ---------------- 命令行调用 ----------------
 if __name__ == "__main__":
@@ -54,14 +51,17 @@ if __name__ == "__main__":
     parser.add_argument("--out", default=None, help="可选输出 CSV 文件")
     args = parser.parse_args()
 
-    delta = score_variant(args.rsid, args.chrom, args.pos, args.ref, args.alt)
+    # 直接创建模型
+    dna_model = dna_client.create(API_KEY)
+    var_df = score_variant(dna_model, args.rsid, args.chrom, args.pos, args.ref, args.alt)
+    delta_scalar = float(var_df["nonzero_mean"].mean())
 
     # 输出 TXT 或 CSV
     if args.out:
         with open(args.out, "a", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([args.rsid, args.chrom, args.pos, args.ref, args.alt, delta])
+            writer.writerow([args.rsid, args.chrom, args.pos, args.ref, args.alt, delta_scalar])
     else:
         with open(f"{args.rsid}.txt", "w") as f:
-            f.write(f"{args.rsid},{args.chrom},{args.pos},{args.ref},{args.alt},{delta}\n")
+            f.write(f"{args.rsid},{args.chrom},{args.pos},{args.ref},{args.alt},{delta_scalar}\n")
         print(f"[SAVE] {args.rsid}.txt written.")
