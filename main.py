@@ -19,10 +19,10 @@ def score_variant(dna_model, chrom, pos, ref, alt):
     )
 
     # AlphaGenome 最小窗口 16384bp
-    interval = variant.reference_interval.resize(2048)
+    interval = variant.reference_interval.resize(16384)
 
     scorer = variant_scorers.CenterMaskScorer(
-        width=None,
+        width=500,
         aggregation_type=variant_scorers.AggregationType.DIFF_MEAN,
         requested_output=dna_client.OutputType.RNA_SEQ,
     )
