@@ -6,7 +6,7 @@ API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 # ---------------- 核心函数 ----------------
 def score_variant(rsid, chrom, pos, ref, alt):
     """
-    输入 rsID 和变异位点信息，返回 delta_score
+    输入 rsID 和变异位点信息，返回 delta_score (唯一数值)
     """
     print(f"[INFO] Scoring {rsid}: {chrom}:{pos} {ref}>{alt}")
 
@@ -21,7 +21,7 @@ def score_variant(rsid, chrom, pos, ref, alt):
         alternate_bases=alt,
     )
 
-    # AlphaGenome 支持的最小窗口 16384bp
+    # AlphaGenome 规定窗口必须 >= 16384bp
     interval = variant.reference_interval.resize(16384)
 
     scorer = variant_scorers.CenterMaskScorer(
@@ -37,9 +37,16 @@ def score_variant(rsid, chrom, pos, ref, alt):
         organism=dna_client.Organism.HOMO_SAPIENS,
     )
 
-    delta = result[0].var
-    print(f"[OK] {rsid} Δ = {delta}")
-    return delta
+    # ---- ⬇⬇⬇ 修改部分：矩阵 → 单一评分 ----
+    var_df = result[0].var  # DataFrame
+
+    # 计算唯一评分：abs(delta).mean()
+    delta_scalar = float(abs(var_df["delta"]).mean())
+    # ---- ⬆⬆⬆ 修改结束 ----
+
+    print(f"[OK] {rsid} 单一 Δ = {delta_scalar}")
+    return delta_scalar
+
 
 # ---------------- 命令行调用 ----------------
 if __name__ == "__main__":
