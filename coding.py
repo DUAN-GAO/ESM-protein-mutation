@@ -3,7 +3,8 @@ import argparse
 import time
 import requests
 from esm import pretrained
-
+import urllib.parse
+import csv
 
 def parse_vcf_csq_format(csq_field):
     """
@@ -18,10 +19,16 @@ def parse_vcf_csq_format(csq_field):
     protein_change = fields[10]  # NP_001009931.1:p.Arg1442Gln
     refseq_id = fields[0]        # RefSeq 列
 
-    if ":p." not in protein_change or "=" in protein_change:
-        return None  # 同义突变或缺失信息
+    if ":p." not in protein_change:
+        return None
 
-    aa_change = protein_change.split(":p.")[1]  # Arg1442Gln
+    aa_change = protein_change.split(":p.")[1]
+    aa_change = urllib.parse.unquote(aa_change)  # 处理 %3D 等 URL 编码
+
+    # 同义突变末尾是 "=" 或 "-"，跳过
+    if aa_change.endswith("=") or aa_change == "-":
+        return None
+
     wt = aa_change[0]
     mut = aa_change[-1]
     pos_digits = "".join([c for c in aa_change if c.isdigit()])
@@ -39,7 +46,7 @@ def refseq_to_uniprot(refseq_id):
     url = "https://rest.uniprot.org/idmapping/run"
     data = {"from": "RefSeq_Protein", "to": "UniProtKB", "ids": refseq_id}
     try:
-        r = requests.post(url, data=data)
+        r = requests.post(url, data=data, timeout=10)
         if r.status_code != 200:
             print(f"[WARN] Mapping失败: {r.status_code}")
             return None
@@ -48,16 +55,15 @@ def refseq_to_uniprot(refseq_id):
         print(f"[WARN] Mapping请求异常: {e}")
         return None
 
-    # 查询状态
     status_url = f"https://rest.uniprot.org/idmapping/status/{job_id}"
     while True:
-        s = requests.get(status_url).json()
+        s = requests.get(status_url, timeout=10).json()
         if s.get("jobStatus") == "FINISHED":
             break
+        time.sleep(1)
 
-    # 获取结果
     result_url = f"https://rest.uniprot.org/idmapping/uniprotkb/results/{job_id}"
-    r2 = requests.get(result_url)
+    r2 = requests.get(result_url, timeout=10)
     res = r2.json()
     if res.get("results"):
         return res["results"][0]["to"]
@@ -70,7 +76,6 @@ def fetch_uniprot_sequence(uniprot_id):
     """
     api_url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.fasta"
     print(f"[API] Fetching protein from UniProt: {api_url}")
-
     try:
         r = requests.get(api_url, timeout=10)
     except Exception as e:
@@ -91,17 +96,23 @@ def fetch_uniprot_sequence(uniprot_id):
 
 
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
+    """
+    使用 ESM 模型计算 Δscore
+    """
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
+
     seq = list(wildtype_sequence)
     seq[mutation_position] = alphabet.get_tok(alphabet.mask_idx)
     masked_sequence_str = "".join(seq)
     data = [("protein", masked_sequence_str)]
     _, _, batch_tokens = batch_converter(data)
+
     with torch.no_grad():
         outputs = model(batch_tokens, repr_layers=[])
         logits = outputs["logits"]
+
     mask_logits = logits[0, mutation_position + 1, :]
     probabilities = torch.softmax(mask_logits, dim=0)
     wt_idx = alphabet.get_idx(wildtype_aa)
@@ -114,9 +125,6 @@ def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutan
 
 
 def extract_vcf_lines(vcf_file):
-    """
-    读取 VCF 文件中的所有变异记录
-    """
     with open(vcf_file) as f:
         for line in f:
             if not line.startswith("#"):
@@ -124,23 +132,17 @@ def extract_vcf_lines(vcf_file):
 
 
 def extract_vcf_info(vcf_line):
-    """
-    解析 VCF 格式，识别 CSQ 字段
-    """
     columns = vcf_line.split("\t")
     if len(columns) < 8:
         return None
-
     info_field = columns[7]
     csq = None
     for sub in info_field.split(";"):
         if sub.startswith("CSQ="):
             csq = sub.replace("CSQ=", "")
             break
-
     if not csq:
         return None
-
     return parse_vcf_csq_format(csq)
 
 
@@ -175,6 +177,7 @@ if __name__ == "__main__":
         start = time.time()
         delta, p_wt, p_mut = compute_delta_score(sequence, pos, wt, mut)
         end = time.time()
+
         results.append({
             "Protein_ID": uniprot_id,
             "Mutation": f"{wt}{pos+1}{mut}",
@@ -188,7 +191,6 @@ if __name__ == "__main__":
     if not results:
         print("[INFO] 没有有效突变结果，CSV 未生成。")
     else:
-        import csv
         out_csv = "esm_results.csv"
         keys = results[0].keys()
         with open(out_csv, "w", newline="") as f:
