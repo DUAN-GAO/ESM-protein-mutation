@@ -2,35 +2,66 @@ import torch
 import argparse
 import time
 import requests
-import csv
 from esm import pretrained
 
 
 def parse_vcf_csq_format(csq_field):
     """
-    修正 CSQ 解析，支持 VEP 格式：
-    CSQ 列通常是用 | 分隔的字段，蛋白质变化在 12 列
-    返回 pos, wt, mut, uniprot_id, protein_change
+    从 VCF CSQ 字段中识别蛋白突变信息，例如:
+    NP_001009931.1:p.Arg1442Gln → R1442Q
+    如果未包含蛋白突变信息（同义突变等），返回 None
     """
     fields = csq_field.split("|")
-    if len(fields) < 12:
+    if len(fields) < 11:
         return None
 
-    protein_change = fields[11]  # NP_057208.3:p.Val9Leu
-    if not protein_change or ":p." not in protein_change:
+    protein_change = fields[10]  # NP_001009931.1:p.Arg1442Gln
+    refseq_id = fields[0]        # RefSeq 列
+
+    if ":p." not in protein_change or "=" in protein_change:
         return None  # 同义突变或缺失信息
 
-    uniprot_id = protein_change.split(":")[0]
-
-    aa_change = protein_change.split(":p.")[1]  # Val9Leu
+    aa_change = protein_change.split(":p.")[1]  # Arg1442Gln
     wt = aa_change[0]
     mut = aa_change[-1]
     pos_digits = "".join([c for c in aa_change if c.isdigit()])
     if not pos_digits:
         return None
-    pos = int(pos_digits) - 1
+    pos = int(pos_digits) - 1  # 0-based index
 
-    return pos, wt, mut, uniprot_id, protein_change
+    return pos, wt, mut, refseq_id, protein_change
+
+
+def refseq_to_uniprot(refseq_id):
+    """
+    使用 UniProt mapping API 将 RefSeq ID 转为 UniProt accession
+    """
+    url = "https://rest.uniprot.org/idmapping/run"
+    data = {"from": "RefSeq_Protein", "to": "UniProtKB", "ids": refseq_id}
+    try:
+        r = requests.post(url, data=data)
+        if r.status_code != 200:
+            print(f"[WARN] Mapping失败: {r.status_code}")
+            return None
+        job_id = r.json()["jobId"]
+    except Exception as e:
+        print(f"[WARN] Mapping请求异常: {e}")
+        return None
+
+    # 查询状态
+    status_url = f"https://rest.uniprot.org/idmapping/status/{job_id}"
+    while True:
+        s = requests.get(status_url).json()
+        if s.get("jobStatus") == "FINISHED":
+            break
+
+    # 获取结果
+    result_url = f"https://rest.uniprot.org/idmapping/uniprotkb/results/{job_id}"
+    r2 = requests.get(result_url)
+    res = r2.json()
+    if res.get("results"):
+        return res["results"][0]["to"]
+    return None
 
 
 def fetch_uniprot_sequence(uniprot_id):
@@ -55,13 +86,11 @@ def fetch_uniprot_sequence(uniprot_id):
         print(f"[WARN] 获取的蛋白长度异常 ({len(seq)} aa)")
         return None
 
+    print(f"[OK] Protein length: {len(seq)} aa")
     return seq
 
 
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
-    """
-    计算 Δscore
-    """
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
@@ -86,7 +115,7 @@ def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutan
 
 def extract_vcf_lines(vcf_file):
     """
-    读取 VCF 文件中所有非注释行
+    读取 VCF 文件中的所有变异记录
     """
     with open(vcf_file) as f:
         for line in f:
@@ -94,66 +123,76 @@ def extract_vcf_lines(vcf_file):
                 yield line.strip()
 
 
-def extract_csq_info(info_field):
+def extract_vcf_info(vcf_line):
     """
-    解析 VCF INFO 字段，获取 CSQ 注释
+    解析 VCF 格式，识别 CSQ 字段
     """
+    columns = vcf_line.split("\t")
+    if len(columns) < 8:
+        return None
+
+    info_field = columns[7]
     csq = None
     for sub in info_field.split(";"):
         if sub.startswith("CSQ="):
             csq = sub.replace("CSQ=", "")
             break
+
     if not csq:
         return None
+
     return parse_vcf_csq_format(csq)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESM protein mutation scoring from VCF")
     parser.add_argument("--vcf", type=str, required=True, help="VCF file path with annotation")
-    parser.add_argument("--outcsv", type=str, default="esm_results.csv", help="Output CSV file")
     args = parser.parse_args()
 
-    results = []
-
     print("[STEP 1] Reading VCF and parsing mutations...")
+    results = []
     for line in extract_vcf_lines(args.vcf):
-        columns = line.split("\t")
-        if len(columns) < 8:
-            continue
-        info_field = columns[7]
-        csq_info = extract_csq_info(info_field)
-        if not csq_info:
-            print(f"[INFO] 未检测到蛋白突变信息，可能为同义突变，跳过：{line[:50]}...")
+        info = extract_vcf_info(line)
+        if not info:
+            print(f"[INFO] 未检测到蛋白突变信息，可能为同义突变，跳过：{line}")
             continue
 
-        pos, wt, mut, uniprot_id, protein_change = csq_info
+        pos, wt, mut, refseq_id, protein_change = info
         print(f"[INFO] Mutation parsed: {protein_change} ({wt}{pos+1}{mut})")
+
+        # RefSeq → UniProt
+        uniprot_id = refseq_to_uniprot(refseq_id)
+        if not uniprot_id:
+            print(f"[WARN] 无法映射 {refseq_id} 到 UniProt ID，跳过...")
+            continue
 
         sequence = fetch_uniprot_sequence(uniprot_id)
         if not sequence:
             print(f"[WARN] 无法获取蛋白序列 {uniprot_id}，跳过...")
             continue
 
-        print(f"[STEP 2] ESM scoring for {protein_change}...")
+        print("[STEP 2] ESM Deep Mutation Scoring...")
         start = time.time()
         delta, p_wt, p_mut = compute_delta_score(sequence, pos, wt, mut)
         end = time.time()
-
         results.append({
             "Protein_ID": uniprot_id,
             "Mutation": f"{wt}{pos+1}{mut}",
-            "P_Wild": p_wt,
-            "P_Mutant": p_mut,
-            "Delta_score": delta,
-            "Runtime_sec": round(end - start, 2)
+            "P_WT": p_wt,
+            "P_Mut": p_mut,
+            "Delta": delta,
+            "Runtime_s": end - start
         })
+        print(f"[OK] Δscore={delta:.4f}, runtime={end-start:.2f}s\n")
 
-    if results:
-        with open(args.outcsv, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+    if not results:
+        print("[INFO] 没有有效突变结果，CSV 未生成。")
+    else:
+        import csv
+        out_csv = "esm_results.csv"
+        keys = results[0].keys()
+        with open(out_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=keys)
             writer.writeheader()
             writer.writerows(results)
-        print(f"\n[OK] 计算完成，结果已保存到 {args.outcsv}")
-    else:
-        print("\n[INFO] 没有有效突变结果，CSV 未生成。")
+        print(f"[DONE] 结果已保存到 {out_csv}")
