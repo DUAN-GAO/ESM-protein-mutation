@@ -1,212 +1,124 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import argparse, csv, time, requests, sys, re
-from esm import pretrained
 import torch
-import gzip
+import argparse
+import time
+import requests
+from esm import pretrained
 
-# ---------------- compute_delta_score ----------------
-def compute_delta_score(seq, aa_pos, wt, mut):
+
+def parse_vcf_csq_format(csq_field):
+    """
+    从 VCF CSQ 字段中识别蛋白突变信息，例如:
+    NP_001009931.1:p.Arg1442Gln → R1442Q
+    """
+    fields = csq_field.split("|")
+    protein_change = fields[10]  # 如: NP_001009931.1:p.Arg1442Gln
+    uniprot_id = fields[8]       # Transcript 例如 NM_001009931.3
+
+    if ":p." not in protein_change:
+        raise ValueError("No protein change format found in VCF CSQ")
+
+    aa_change = protein_change.split(":p.")[1]  # Arg1442Gln
+    wt = aa_change[0]                          # R
+    mut = aa_change[-1]                        # Q
+    pos = int("".join([c for c in aa_change if c.isdigit()])) - 1  # 转 0-based
+
+    return pos, wt, mut, uniprot_id, protein_change
+
+
+def fetch_uniprot_sequence(uniprot_id):
+    """
+    通过 UniProt 获取蛋白序列
+    """
+    api_url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.fasta"
+    print(f"[API] Fetching protein from UniProt: {api_url}")
+
+    r = requests.get(api_url)
+    if r.status_code != 200:
+        raise ValueError(f"Failed to fetch UniProt FASTA for {uniprot_id}")
+
+    seq = "".join([l.strip() for l in r.text.split("\n") if not l.startswith(">")])
+
+    print(f"[OK] Protein length: {len(seq)} aa")
+    return seq
+
+
+def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
+    """
+    运行 ESM-1b 模型用于打分
+    """
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
 
-    masked_seq = list(seq)
-    masked_seq[aa_pos] = alphabet.get_tok(alphabet.mask_idx)
-    masked_seq_str = "".join(masked_seq)
-    data = [("protein", masked_seq_str)]
+    seq = list(wildtype_sequence)
+    seq[mutation_position] = alphabet.get_tok(alphabet.mask_idx)
+    masked_sequence_str = "".join(seq)
+
+    data = [("protein", masked_sequence_str)]
     _, _, batch_tokens = batch_converter(data)
 
     with torch.no_grad():
         outputs = model(batch_tokens, repr_layers=[])
         logits = outputs["logits"]
 
-    mask_logits = logits[0, aa_pos + 1, :]
-    probs = torch.softmax(mask_logits, dim=0)
-    p_wt = probs[alphabet.get_idx(wt)].item()
-    p_mut = probs[alphabet.get_idx(mut)].item()
+    mask_logits = logits[0, mutation_position + 1, :]
+    probabilities = torch.softmax(mask_logits, dim=0)
+
+    wt_index = alphabet.get_idx(wildtype_aa)
+    mut_index = alphabet.get_idx(mutant_aa)
+
+    p_wild = probabilities[wt_index].item()
+    p_mut = probabilities[mut_index].item()
 
     epsilon = 1e-10
-    delta_score = torch.log(torch.tensor(p_mut + epsilon) / torch.tensor(p_wt + epsilon)).item()
-    return delta_score
+    delta_score = torch.log(torch.tensor(p_mut + epsilon) / torch.tensor(p_wild + epsilon)).item()
 
-# ---------------- helpers ----------------
-def _normalize_chrom(chrom):
-    chrom = str(chrom)
-    if chrom.lower().startswith("chr"):
-        chrom = chrom[3:]
-    return chrom
+    return delta_score, p_wild, p_mut
 
-def open_vcf(path):
-    return gzip.open(path, "rt") if path.endswith(".gz") else open(path, "rt")
 
-def load_vcf(path):
-    variants = []
-    with open_vcf(path) as f:
-        for line in f:
-            if line.startswith("#"): continue
-            fields = line.strip().split("\t")
-            if len(fields) < 5: continue
-            chrom, pos, _, ref, alts = fields[0:5]
-            for alt in alts.split(","):
-                variants.append({"chrom": chrom, "pos": int(pos), "ref": ref, "alt": alt})
-    return variants
+def extract_vcf_info(vcf_line):
+    """
+    解析 VCF 格式，自动识别 CSQ 字段
+    """
+    columns = vcf_line.split("\t")
+    info_field = columns[7]
 
-# ---------------- VEP annotation ----------------
-def annotate_with_vep(variants, chunk_size=200, pause=0.2):
-    endpoint = "https://rest.ensembl.org/vep/human/region"
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    results = []
+    csq = None
+    for sub in info_field.split(";"):
+        if sub.startswith("CSQ="):
+            csq = sub.replace("CSQ=", "")
+            break
 
-    for i in range(0, len(variants), chunk_size):
-        chunk = variants[i:i+chunk_size]
-        var_strs = [f"{_normalize_chrom(v['chrom'])} {v['pos']} . {v['ref']} {v['alt']}" for v in chunk]
-        payload = {"variants": var_strs}
+    if not csq:
+        raise ValueError("No CSQ annotation found in VCF INFO field")
 
-        r = None
-        for attempt in range(4):
-            try:
-                r = requests.post(endpoint, headers=headers, json=payload, timeout=30)
-                if r.status_code == 200: break
-                elif r.status_code == 429: time.sleep((2**attempt)*1.0)
-                else: time.sleep(0.5)
-            except Exception as e:
-                print(f"[DEBUG] VEP request exception: {e}", file=sys.stderr)
-                time.sleep(0.5)
+    return parse_vcf_csq_format(csq)
 
-        if r is None or r.status_code != 200:
-            for v in chunk: results.append({**v, "vep": None})
-            continue
 
-        try:
-            data = r.json()
-        except Exception:
-            for v in chunk: results.append({**v, "vep": None})
-            continue
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run ESM score directly from VCF mutation line")
+    parser.add_argument("--vcf", type=str, required=True, help="Single-line VCF record containing CSQ annotation")
 
-        for v, raw in zip(chunk, data):
-            results.append({**v, "vep": raw})
-
-        time.sleep(pause)
-    return results
-
-# ---------------- HGVS parsing ----------------
-def three_to_one(aa):
-    table = {'Ala':'A','Arg':'R','Asn':'N','Asp':'D','Cys':'C','Gln':'Q','Glu':'E','Gly':'G',
-             'His':'H','Ile':'I','Leu':'L','Lys':'K','Met':'M','Phe':'F','Pro':'P','Ser':'S',
-             'Thr':'T','Trp':'W','Tyr':'Y','Val':'V','Sec':'U','Pyl':'O'}
-    if aa is None: return None
-    aa = str(aa)
-    if len(aa)==1: return aa
-    return table.get(aa, aa[0] if len(aa)>0 else None)
-
-def parse_hgvsp(hgvsp):
-    if not hgvsp: return None
-    if ":p." in hgvsp: p = hgvsp.split(":p.")[1]
-    elif "p." in hgvsp: p = hgvsp.split("p.")[1]
-    else: p = hgvsp
-    m = re.match(r"([A-Za-z]{1,3}|[A-Za-z])(\d+)([A-Za-z]{1,3}|\*|[A-Za-z])", p)
-    if not m: return None
-    ref, pos, alt = m.group(1), int(m.group(2)), m.group(3)
-    return {"ref": three_to_one(ref), "pos": pos, "alt": three_to_one(alt) if alt!="*" else "*"}
-
-# ---------------- fetch protein sequence ----------------
-def fetch_protein_seq(protein_id):
-    if not protein_id:
-        return None
-    if protein_id.startswith("ENSP"):
-        url = f"https://rest.ensembl.org/sequence/id/{protein_id}?type=protein"
-        headers = {"Accept": "text/x-fasta"}
-    else:  # RefSeq NP_*
-        url = f"https://www.ncbi.nlm.nih.gov/protein/{protein_id}?report=fasta&format=text"
-        headers = {"Accept": "text/plain"}
-    try:
-        r = requests.get(url, headers=headers, timeout=20)
-        if r.status_code == 200:
-            lines = r.text.strip().splitlines()
-            return "".join([l.strip() for l in lines if not l.startswith(">")])
-        else:
-            print(f"[DEBUG] Protein fetch failed for {protein_id} {r.status_code}", file=sys.stderr)
-    except Exception as e:
-        print(f"[DEBUG] Protein fetch failed for {protein_id}: {e}", file=sys.stderr)
-    return None
-
-# ---------------- Main ----------------
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--vcf", required=True)
-    parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    variants = load_vcf(args.vcf)
-    print(f"[INFO] Loaded {len(variants)} variants from {args.vcf}")
+    print("[STEP 1] Parsing VCF...")
+    pos, wt, mut, uniprot_id, protein_change = extract_vcf_info(args.vcf)
 
-    annotated = annotate_with_vep(variants)
-    print(f"[INFO] VEP annotation done, {len(annotated)} records")
+    print(f"[INFO] Protein mutation parsed: {protein_change}")
+    print(f"[INFO] WT={wt} MUT={mut} POS={pos+1}")
 
-    with open(args.out, "w", newline="") as fh:
-        w = csv.writer(fh, delimiter="\t")
-        w.writerow(["chrom","pos","ref","alt","delta_score"])
+    print("\n[STEP 2] Fetching protein sequence...")
+    sequence = fetch_uniprot_sequence(uniprot_id)
 
-        for v in annotated:
-            vep = v.get("vep")
-            if not vep:
-                w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
-                continue
+    print("\n[STEP 3] Running ESM inference...")
+    start = time.time()
+    delta, p_wt, p_mut = compute_delta_score(sequence, pos, wt, mut)
+    end = time.time()
 
-            tc_list = vep.get("transcript_consequences") or []
-            protein_tcs = [t for t in tc_list if t.get("biotype")=="protein_coding" or t.get("gene_biotype")=="protein_coding"]
-
-            tc = None
-            for t in protein_tcs:
-                if t.get("canonical")==1 and (t.get("ensembl_peptide_id") or t.get("protein_id")) and t.get("hgvsp"):
-                    tc = t
-                    break
-            if not tc:
-                for t in protein_tcs:
-                    if (t.get("ensembl_peptide_id") or t.get("protein_id")) and t.get("hgvsp"):
-                        tc = t
-                        break
-            if not tc and protein_tcs:
-                tc = protein_tcs[0]
-
-            if not tc:
-                print(f"[INFO] No protein coding transcript with sequence for {v['chrom']}:{v['pos']}", file=sys.stderr)
-                w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
-                continue
-
-            protein_id = tc.get("ensembl_peptide_id") or tc.get("protein_id")
-            parsed = parse_hgvsp(tc.get("hgvsp")) if tc.get("hgvsp") else None
-            if not parsed and tc.get("amino_acids") and tc.get("protein_start"):
-                aa = tc["amino_acids"].split("/")
-                if len(aa)==2:
-                    parsed = {"ref": three_to_one(aa[0]), "pos": int(tc["protein_start"]), "alt": three_to_one(aa[1])}
-
-            if not parsed:
-                print(f"[INFO] Cannot parse amino acid change for {protein_id}", file=sys.stderr)
-                w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
-                continue
-
-            seq = fetch_protein_seq(protein_id)
-            if not seq:
-                print(f"[INFO] Cannot fetch protein sequence for {protein_id}", file=sys.stderr)
-                w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
-                continue
-
-            aa_pos = parsed["pos"] - 1
-            if aa_pos < 0 or aa_pos >= len(seq):
-                print(f"[INFO] Amino acid position {aa_pos} out of range for {protein_id}", file=sys.stderr)
-                w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], None])
-                continue
-
-            try:
-                delta = compute_delta_score(seq, aa_pos, parsed["ref"], parsed["alt"])
-            except Exception as e:
-                print(f"[DEBUG] delta_score failed for {protein_id}: {e}", file=sys.stderr)
-                delta = None
-
-            w.writerow([v["chrom"], v["pos"], v["ref"], v["alt"], delta])
-
-if __name__=="__main__":
-    main()
+    print("\n===== ESM PREDICTION RESULT =====")
+    print(f"Protein: {uniprot_id}")
+    print(f"Mutation: {wt}{pos+1}{mut}")
+    print(f"P(wild-type)  = {p_wt:.6f}")
+    print(f"P(mutant)     = {p_mut:.6f}")
+    print(f"Δscore (log(mut/wt)) = {delta:.4f}")
+    print(f"Runtime: {end - start:.2f} sec")
