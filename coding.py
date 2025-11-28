@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import torch
 import argparse
 import time
@@ -35,12 +37,7 @@ def parse_vcf_csq_format(csq_field):
 
     # 正则匹配三字母或单字母形式
     m = re.match(r'^([A-Z][a-z]{2})(\d+)([A-Z][a-z]{2})$', aa_change)
-    if not m:
-        m2 = re.match(r'^([A-Z])(\d+)([A-Z])$', aa_change)
-        if not m2:
-            return None
-        wt, pos_str, mut = m2.groups()
-    else:
+    if m:
         wt, pos_str, mut = m.groups()
         # 三字母 -> 单字母
         aa3to1 = {
@@ -50,6 +47,11 @@ def parse_vcf_csq_format(csq_field):
         }
         wt = aa3to1.get(wt, wt)
         mut = aa3to1.get(mut, mut)
+    else:
+        m2 = re.match(r'^([A-Z])(\d+)([A-Z])$', aa_change)
+        if not m2:
+            return None
+        wt, pos_str, mut = m2.groups()
 
     pos = int(pos_str) - 1  # 0-based
     return pos, wt, mut, refseq_id, protein_change
@@ -76,6 +78,7 @@ def refseq_to_uniprot(refseq_id):
         s = requests.get(status_url).json()
         if s.get("jobStatus") == "FINISHED":
             break
+        time.sleep(1)
 
     # 获取结果
     result_url = f"https://rest.uniprot.org/idmapping/uniprotkb/results/{job_id}"
