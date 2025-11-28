@@ -15,7 +15,7 @@ def parse_vcf_csq_format(csq_field):
     if len(fields) < 11:
         return None
 
-    protein_change = fields[10]  # 例如: NP_001009931.1:p.Arg1442Gln
+    protein_change = fields[10]  # NP_001009931.1:p.Arg1442Gln
     uniprot_id = fields[0]       # 修正为真实 UniProt 列
 
     if ":p." not in protein_change:
@@ -59,24 +59,30 @@ def fetch_uniprot_sequence(uniprot_id):
 
 
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
-    # 保持逻辑完全不动
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
+    
     seq = list(wildtype_sequence)
     seq[mutation_position] = alphabet.get_tok(alphabet.mask_idx)
     masked_sequence_str = "".join(seq)
+    
     data = [("protein", masked_sequence_str)]
     _, _, batch_tokens = batch_converter(data)
+    
     with torch.no_grad():
         outputs = model(batch_tokens, repr_layers=[])
         logits = outputs["logits"]
-    mask_logits = logits[0, mutation_position+1, :]
+    
+    mask_logits = logits[0, mutation_position + 1, :]
     probabilities = torch.softmax(mask_logits, dim=0)
+    
     wt_idx = alphabet.get_idx(wildtype_aa)
     mut_idx = alphabet.get_idx(mutant_aa)
+    
     p_wild = probabilities[wt_idx].item()
     p_mutant = probabilities[mut_idx].item()
+    
     epsilon = 1e-10
     delta_score = torch.log(torch.tensor(p_mutant + epsilon) / torch.tensor(p_wild + epsilon)).item()
     return delta_score, p_wild, p_mutant
@@ -132,7 +138,6 @@ if __name__ == "__main__":
         exit(0)
 
     pos, wt, mut, uniprot_id, protein_change = info
-
     print(f"[INFO] Mutation parsed: {protein_change}")
     print(f"[INFO] WT={wt} MUT={mut} POS={pos + 1}")
 
