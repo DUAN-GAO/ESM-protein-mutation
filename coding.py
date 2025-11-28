@@ -2,6 +2,7 @@ import torch
 import argparse
 import time
 import requests
+import csv
 from esm import pretrained
 
 
@@ -15,7 +16,7 @@ def parse_vcf_csq_format(csq_field):
     if len(fields) < 11:
         return None
 
-    protein_change = fields[10]  # NP_001009931.1:p.Arg1442Gln
+    protein_change = fields[10]  # 例如: NP_001009931.1:p.Arg1442Gln
     uniprot_id = fields[0]       # 修正为真实 UniProt 列
 
     if ":p." not in protein_change:
@@ -59,44 +60,29 @@ def fetch_uniprot_sequence(uniprot_id):
 
 
 def compute_delta_score(wildtype_sequence, mutation_position, wildtype_aa, mutant_aa):
+    """
+    计算 ESM Δscore
+    """
     model, alphabet = pretrained.esm1b_t33_650M_UR50S()
     model.eval()
     batch_converter = alphabet.get_batch_converter()
-    
     seq = list(wildtype_sequence)
     seq[mutation_position] = alphabet.get_tok(alphabet.mask_idx)
     masked_sequence_str = "".join(seq)
-    
     data = [("protein", masked_sequence_str)]
     _, _, batch_tokens = batch_converter(data)
-    
     with torch.no_grad():
         outputs = model(batch_tokens, repr_layers=[])
         logits = outputs["logits"]
-    
-    mask_logits = logits[0, mutation_position + 1, :]
+    mask_logits = logits[0, mutation_position+1, :]
     probabilities = torch.softmax(mask_logits, dim=0)
-    
     wt_idx = alphabet.get_idx(wildtype_aa)
     mut_idx = alphabet.get_idx(mutant_aa)
-    
     p_wild = probabilities[wt_idx].item()
     p_mutant = probabilities[mut_idx].item()
-    
     epsilon = 1e-10
     delta_score = torch.log(torch.tensor(p_mutant + epsilon) / torch.tensor(p_wild + epsilon)).item()
     return delta_score, p_wild, p_mutant
-
-
-def extract_vcf_line(vcf_file):
-    """
-    读取 VCF 文件中的第一条变异记录
-    """
-    with open(vcf_file) as f:
-        for line in f:
-            if not line.startswith("#"):
-                return line.strip()
-    return None
 
 
 def extract_vcf_info(vcf_line):
@@ -123,39 +109,50 @@ def extract_vcf_info(vcf_line):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESM protein mutation scoring from VCF")
     parser.add_argument("--vcf", type=str, required=True, help="VCF file path with annotation")
+    parser.add_argument("--out", type=str, default="esm_results.csv", help="Output CSV file")
     args = parser.parse_args()
 
-    print("[STEP 1] Reading VCF file...")
-    line = extract_vcf_line(args.vcf)
-    if not line:
-        print("[WARN] VCF文件中未找到有效突变条目")
-        exit(0)
+    results = []
 
-    print("[STEP 2] Parsing CSQ...")
-    info = extract_vcf_info(line)
-    if not info:
-        print("[INFO] 未检测到蛋白突变信息，可能为同义突变，跳过计算")
-        exit(0)
+    with open(args.vcf) as f:
+        for line in f:
+            if line.startswith("#"):
+                continue  # 跳过头部
+            line = line.strip()
+            info = extract_vcf_info(line)
+            if not info:
+                print(f"[INFO] 未检测到蛋白突变信息，可能为同义突变，跳过：{line}")
+                continue
 
-    pos, wt, mut, uniprot_id, protein_change = info
-    print(f"[INFO] Mutation parsed: {protein_change}")
-    print(f"[INFO] WT={wt} MUT={mut} POS={pos + 1}")
+            pos, wt, mut, uniprot_id, protein_change = info
+            print(f"\n[INFO] Mutation parsed: {protein_change} (WT={wt} MUT={mut} POS={pos+1})")
 
-    print("\n[STEP 3] Fetching UniProt sequence...")
-    sequence = fetch_uniprot_sequence(uniprot_id)
-    if not sequence:
-        print("[WARN] 无法获取蛋白序列，跳过计算")
-        exit(0)
+            sequence = fetch_uniprot_sequence(uniprot_id)
+            if not sequence:
+                print(f"[WARN] 无法获取蛋白序列，跳过：{protein_change}")
+                continue
 
-    print("\n[STEP 4] ESM Deep Mutation Scoring...")
-    start = time.time()
-    delta, p_wt, p_mut = compute_delta_score(sequence, pos, wt, mut)
-    end = time.time()
+            start = time.time()
+            delta, p_wt, p_mut = compute_delta_score(sequence, pos, wt, mut)
+            end = time.time()
 
-    print("\n===== ESM PREDICTION RESULT =====")
-    print(f"Protein ID: {uniprot_id}")
-    print(f"Mutation: {wt}{pos + 1}{mut}")
-    print(f"P(Wild-type)     = {p_wt:.6f}")
-    print(f"P(Mutant)        = {p_mut:.6f}")
-    print(f"Δscore (log ratio) = {delta:.4f}")
-    print(f"Runtime: {end - start:.2f} sec\n")
+            print(f"[OK] Δscore={delta:.4f}, Runtime={end-start:.2f} sec")
+            results.append({
+                "Protein_ID": uniprot_id,
+                "Mutation": f"{wt}{pos+1}{mut}",
+                "P_WT": p_wt,
+                "P_Mut": p_mut,
+                "Delta": delta,
+                "Runtime_sec": round(end-start, 2)
+            })
+
+    # 输出 CSV
+    if results:
+        keys = results[0].keys()
+        with open(args.out, "w", newline="") as out_csv:
+            writer = csv.DictWriter(out_csv, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(results)
+        print(f"\n[INFO] 所有结果已保存到 {args.out}")
+    else:
+        print("\n[INFO] 没有有效突变结果，CSV 未生成。")
