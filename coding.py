@@ -9,22 +9,25 @@ def parse_vcf_csq_format(csq_field):
     """
     从 VCF CSQ 字段中识别蛋白突变信息，例如:
     NP_001009931.1:p.Arg1442Gln → R1442Q
+    如果未包含蛋白突变信息（同义突变等），返回 None
     """
     fields = csq_field.split("|")
-
     if len(fields) < 11:
-        raise ValueError(f"CSQ字段格式异常: {csq_field}")
+        return None
 
     protein_change = fields[10]  # 例如: NP_001009931.1:p.Arg1442Gln
     uniprot_id = fields[0]       # 修正为真实 UniProt 列
 
     if ":p." not in protein_change:
-        raise ValueError("未从 CSQ提取到蛋白突变信息 (缺少 :p.)")
+        return None  # 同义突变或缺失信息
 
     aa_change = protein_change.split(":p.")[1]  # Arg1442Gln
     wt = aa_change[0]                           # 原氨基酸
     mut = aa_change[-1]                         # 突变氨基酸
-    pos = int("".join([c for c in aa_change if c.isdigit()])) - 1  # 转 0-based index
+    pos_digits = "".join([c for c in aa_change if c.isdigit()])
+    if not pos_digits:
+        return None
+    pos = int(pos_digits) - 1  # 转 0-based index
 
     return pos, wt, mut, uniprot_id, protein_change
 
@@ -39,14 +42,17 @@ def fetch_uniprot_sequence(uniprot_id):
     try:
         r = requests.get(api_url, timeout=10)
     except Exception as e:
-        raise ValueError(f"[ERROR] 请求 UniProt 失败: {e}")
+        print(f"[WARN] 请求 UniProt 失败: {e}")
+        return None
 
     if r.status_code != 200:
-        raise ValueError(f"[ERROR] UniProt 访问失败: 状态码 {r.status_code}")
+        print(f"[WARN] UniProt 访问失败: 状态码 {r.status_code}")
+        return None
 
     seq = "".join([l.strip() for l in r.text.split("\n") if not l.startswith(">")])
     if len(seq) < 50:
-        raise ValueError("[ERROR] 获取的蛋白长度异常，请检查ID是否正确")
+        print(f"[WARN] 获取的蛋白长度异常 ({len(seq)} aa)")
+        return None
 
     print(f"[OK] Protein length: {len(seq)} aa")
     return seq
@@ -84,7 +90,7 @@ def extract_vcf_line(vcf_file):
         for line in f:
             if not line.startswith("#"):
                 return line.strip()
-    raise ValueError("VCF中未找到有效突变条目")
+    return None
 
 
 def extract_vcf_info(vcf_line):
@@ -93,7 +99,7 @@ def extract_vcf_info(vcf_line):
     """
     columns = vcf_line.split("\t")
     if len(columns) < 8:
-        raise ValueError("VCF 格式错误: INFO 字段缺失")
+        return None
 
     info_field = columns[7]
     csq = None
@@ -103,7 +109,7 @@ def extract_vcf_info(vcf_line):
             break
 
     if not csq:
-        raise ValueError("未检测到 CSQ 注释字段，请先使用 VEP 注释")
+        return None
 
     return parse_vcf_csq_format(csq)
 
@@ -115,15 +121,26 @@ if __name__ == "__main__":
 
     print("[STEP 1] Reading VCF file...")
     line = extract_vcf_line(args.vcf)
+    if not line:
+        print("[WARN] VCF文件中未找到有效突变条目")
+        exit(0)
 
     print("[STEP 2] Parsing CSQ...")
-    pos, wt, mut, uniprot_id, protein_change = extract_vcf_info(line)
+    info = extract_vcf_info(line)
+    if not info:
+        print("[INFO] 未检测到蛋白突变信息，可能为同义突变，跳过计算")
+        exit(0)
+
+    pos, wt, mut, uniprot_id, protein_change = info
 
     print(f"[INFO] Mutation parsed: {protein_change}")
     print(f"[INFO] WT={wt} MUT={mut} POS={pos + 1}")
 
     print("\n[STEP 3] Fetching UniProt sequence...")
     sequence = fetch_uniprot_sequence(uniprot_id)
+    if not sequence:
+        print("[WARN] 无法获取蛋白序列，跳过计算")
+        exit(0)
 
     print("\n[STEP 4] ESM Deep Mutation Scoring...")
     start = time.time()
