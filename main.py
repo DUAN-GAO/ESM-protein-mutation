@@ -4,9 +4,12 @@ from alphagenome.models import dna_client, variant_scorers
 API_KEY = "AIzaSyD5Kht8QzCPkHeJ456_Tf_eBWirtKhmaRU"
 
 # ---------------- 核心函数 ----------------
+from alphagenome.data import genome
+from alphagenome.models import dna_client, variant_scorers
+
 def score_variant(dna_model, chrom, pos, ref, alt):
     """
-    输入 dna_model 和变异位点信息，返回 tidy_scores DataFrame
+    使用官方推荐 scorer 对变异打分，返回 tidy_scores DataFrame
     """
     print(f"[INFO] Scoring {chrom}:{pos} {ref}>{alt}")
 
@@ -18,13 +21,11 @@ def score_variant(dna_model, chrom, pos, ref, alt):
         alternate_bases=alt,
     )
 
-    # 最小窗口还是保留，不改结构
+    # 最小窗口 16kb
     interval = variant.reference_interval.resize(16384)
 
-    # ---- 修改点：启用 VariantEffectScorer 来生成 quantile_score ----
-    scorer = variant_scorers.VariantEffectScorer(
-        requested_output=dna_client.OutputType.VARIANT_EFFECT
-    )
+    # ---- 官方推荐 scorer ----
+    scorer = variant_scorers.RECOMMENDED_VARIANT_SCORERS['RNA_SEQ']
 
     # ---- 调用模型 ----
     result = dna_model.score_variant(
@@ -36,10 +37,9 @@ def score_variant(dna_model, chrom, pos, ref, alt):
 
     # ---- tidy 化结果 ----
     tidy_df = variant_scorers.tidy_scores([result[0]], match_gene_strand=True)
-
     print("[DEBUG] 输出字段:", list(tidy_df.columns))
 
-    # ---- 如果 quantile_score 存在则计算，否则 fallback 到 raw_score ----
+    # ---- 计算 Δ-score ----
     if "quantile_score" in tidy_df.columns:
         delta_scalar = float(abs(tidy_df["quantile_score"]).max())
         print(f"[OK] Variant effect score (normalized quantile) = {delta_scalar}")
@@ -48,6 +48,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
         print(f"[WARN] quantile_score 缺失 → 使用 raw_score = {delta_scalar}")
 
     return tidy_df
+
 
 
 # ---------------- 命令行调用 ----------------
