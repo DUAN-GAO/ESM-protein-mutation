@@ -36,7 +36,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
 
     # 使用 tidy_scores 生成最终 Δ-score
     tidy_df = variant_scorers.tidy_scores([result[0]], match_gene_strand=True)
-
+    print(tidy_df)
     # 计算 delta_scalar 使用 raw_score
     delta_scalar = float(abs(tidy_df["quantile_score"]).max())
     print(f"[OK] 单一 Δ = {delta_scalar}")
