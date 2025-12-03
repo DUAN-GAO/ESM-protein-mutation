@@ -41,7 +41,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
 
     # ---- 计算 Δ-score ----
     if "quantile_score" in tidy_df.columns:
-        delta_scalar = float(abs(tidy_df["quantile_score"]).max())
+        delta_scalar = float(abs(tidy_df["quantile_score"]).min())
         print(f"[OK] Variant effect score (normalized quantile) = {delta_scalar}")
     else:
         delta_scalar = float(abs(tidy_df["raw_score"]).max())
