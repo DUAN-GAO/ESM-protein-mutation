@@ -37,7 +37,7 @@ def main(vcf_path, output_csv="results.csv"):
         try:
             tidy_df = score_variant(dna_model, chrom, pos, ref, alt)
             # 使用 raw_score 替换 nonzero_mean
-            delta_scalar = float(abs(tidy_df["raw_score"]).max())
+            delta_scalar = float(abs(tidy_df["quantile_score"]).max())
             results.append({
                 "chrom": chrom,
                 "pos": pos,
