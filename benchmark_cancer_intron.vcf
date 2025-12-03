@@ -228,17 +228,17 @@
 ##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|DISTANCE|STRAND|FLAGS|PICK|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|UNIPROT_ISOFORM|REFSEQ_MATCH|REFSEQ_OFFSET|GIVEN_REF|USED_REF|BAM_EDIT|GENE_PHENO|SIFT|PolyPhen|DOMAINS|miRNA|HGVS_OFFSET|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomADe_AF|gnomADe_AFR_AF|gnomADe_AMR_AF|gnomADe_ASJ_AF|gnomADe_EAS_AF|gnomADe_FIN_AF|gnomADe_NFE_AF|gnomADe_OTH_AF|gnomADe_SAS_AF|gnomADg_AF|gnomADg_AFR_AF|gnomADg_AMI_AF|gnomADg_AMR_AF|gnomADg_ASJ_AF|gnomADg_EAS_AF|gnomADg_FIN_AF|gnomADg_MID_AF|gnomADg_NFE_AF|gnomADg_OTH_AF|gnomADg_SAS_AF|MAX_AF|MAX_AF_POPS|CLIN_SIG|SOMATIC|PHENO|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS">
 ##VEP-command-line='vep --assembly GRCh38 --cache --check_existing --compress_output bgzip --database 0 --dir vep_data/ --dir_plugins /plugins --everything --fasta [PATH]/hg38.noY.fa --flag_pick_allele_gene --fork 8 --format vcf --hgvs --input_file [PATH]/BLOOD_iPSC_deepsomatic.hiphase.norm.vcf.gz --offline --output_file BLOOD_iPSC_deepsomatic.hiphase.norm.vep.vcf.gz --pick --refseq --symbol --vcf'
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	BLOOD_iPSC.tumor
-1	155827701	.	A	C	.	PASS	GWAS=YES	.	.
-9	111836768	.	G	A	.	PASS	GWAS=YES	.	.
-11	83983729	.	T	G	.	PASS	GWAS=YES	.	.
-4	124535968	.	A	G	.	PASS	GWAS=YES	.	.
-10	37513604	.	G	A	.	PASS	GWAS=YES	.	.
-14	36008748	.	C	T	.	PASS	GWAS=YES	.	.
-20	10098748	.	A	G	.	PASS	GWAS=YES	.	.
-13	85811977	.	A	G	.	PASS	GWAS=YES	.	.
-2	135649909	.	A	G	.	PASS	GWAS=YES	.	.
-3	36993455	.	G	A	.	PASS	GWAS=YES	.	.
-22	45329118	.	G	A	.	PASS	GWAS=YES	.	.
-6	33104395	.	T	G	.	PASS	GWAS=YES	.	.
-8	127112950	.	C	T	.	PASS	GWAS=YES	.	.
-10	53506471	.	T	G	.	PASS	GWAS=YES	.	.
+chr1	155827701	.	A	C	.	PASS	GWAS=YES	.	.
+chr9	111836768	.	G	A	.	PASS	GWAS=YES	.	.
+chr11	83983729	.	T	G	.	PASS	GWAS=YES	.	.
+chr4	124535968	.	A	G	.	PASS	GWAS=YES	.	.
+chr10	37513604	.	G	A	.	PASS	GWAS=YES	.	.
+chr14	36008748	.	C	T	.	PASS	GWAS=YES	.	.
+chr20	10098748	.	A	G	.	PASS	GWAS=YES	.	.
+chr13	85811977	.	A	G	.	PASS	GWAS=YES	.	.
+chr2	135649909	.	A	G	.	PASS	GWAS=YES	.	.
+chr3	36993455	.	G	A	.	PASS	GWAS=YES	.	.
+chr22	45329118	.	G	A	.	PASS	GWAS=YES	.	.
+chr6	33104395	.	T	G	.	PASS	GWAS=YES	.	.
+chr8	127112950	.	C	T	.	PASS	GWAS=YES	.	.
+chr10	53506471	.	T	G	.	PASS	GWAS=YES	.	.
