@@ -18,15 +18,15 @@ def score_variant(dna_model, chrom, pos, ref, alt):
         alternate_bases=alt,
     )
 
-    # 最小窗口 16kb
+    # 最小窗口还是保留，不改结构
     interval = variant.reference_interval.resize(16384)
 
-    scorer = variant_scorers.CenterMaskScorer(
-        width=501,
-        aggregation_type=variant_scorers.AggregationType.DIFF_MEAN,
-        requested_output=dna_client.OutputType.RNA_SEQ,
+    # ---- 修改点：启用 VariantEffectScorer 来生成 quantile_score ----
+    scorer = variant_scorers.VariantEffectScorer(
+        requested_output=dna_client.OutputType.VARIANT_EFFECT
     )
 
+    # ---- 调用模型 ----
     result = dna_model.score_variant(
         interval=interval,
         variant=variant,
@@ -34,14 +34,21 @@ def score_variant(dna_model, chrom, pos, ref, alt):
         organism=dna_client.Organism.HOMO_SAPIENS,
     )
 
-    # 使用 tidy_scores 生成最终 Δ-score
+    # ---- tidy 化结果 ----
     tidy_df = variant_scorers.tidy_scores([result[0]], match_gene_strand=True)
-    print(tidy_df.columns)
-    # 计算 delta_scalar 使用 raw_score
-    delta_scalar = float(abs(tidy_df["quantile_score"]).max())
-    print(f"[OK] 单一 Δ = {delta_scalar}")
 
-    return tidy_df  # 返回 tidy_scores DataFrame
+    print("[DEBUG] 输出字段:", list(tidy_df.columns))
+
+    # ---- 如果 quantile_score 存在则计算，否则 fallback 到 raw_score ----
+    if "quantile_score" in tidy_df.columns:
+        delta_scalar = float(abs(tidy_df["quantile_score"]).max())
+        print(f"[OK] Variant effect score (normalized quantile) = {delta_scalar}")
+    else:
+        delta_scalar = float(abs(tidy_df["raw_score"]).max())
+        print(f"[WARN] quantile_score 缺失 → 使用 raw_score = {delta_scalar}")
+
+    return tidy_df
+
 
 # ---------------- 命令行调用 ----------------
 if __name__ == "__main__":
