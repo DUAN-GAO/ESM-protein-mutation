@@ -22,7 +22,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
     )
 
     # 最小窗口 16kb
-    interval = variant.reference_interval.resize(32768) #16384
+    interval = variant.reference_interval.resize(131072) #16384
 
     # ---- 官方推荐 scorer ----
     scorer = variant_scorers.RECOMMENDED_VARIANT_SCORERS['RNA_SEQ']
