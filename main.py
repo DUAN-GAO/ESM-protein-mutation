@@ -41,7 +41,7 @@ def score_variant(dna_model, chrom, pos, ref, alt):
     delta_scalar = float(abs(tidy_df["quantile_score"]).max())
     print(f"[OK] 单一 Δ = {delta_scalar}")
 
-    return tidy_df  # 返回 tidy_scores DataFrame
+    return tidy_df.columns  # 返回 tidy_scores DataFrame
 
 # ---------------- 命令行调用 ----------------
 if __name__ == "__main__":
