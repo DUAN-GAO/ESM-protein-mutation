@@ -39,6 +39,10 @@ def score_variant(dna_model, chrom, pos, ref, alt):
     tidy_df = variant_scorers.tidy_scores([result[0]], match_gene_strand=True)
     print("[DEBUG] 输出字段:", list(tidy_df.columns))
 
+    hits = tidy_df[tidy_df["biosample_type"].fillna('').str.contains("endothelial", case=False)]  #检测是否包含EPC关键字
+    print(hits)
+
+
     # ---- 计算 Δ-score ----
     if "quantile_score" in tidy_df.columns:
         delta_scalar = float(abs(tidy_df["quantile_score"]).min())
