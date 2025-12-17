@@ -12,7 +12,7 @@ Output:
 """
 
 import requests
-from evo2.models import Evo2
+# from evo2.models import Evo2
 
 
 # ======================
@@ -56,6 +56,7 @@ def build_sequences_api(chrom, pos, ref, alt):
     end = pos + half
 
     ref_seq = fetch_sequence_api(chrom, start, end)
+    print(ref_seq)  # test API
     snp_idx = pos - start  # 0-based index in window
 
     if ref_seq[snp_idx] != ref.upper():
@@ -82,7 +83,7 @@ def score_snp_hg38_api(
     alt,
     model_name="evo2_1b_base",
 ):
-    model = Evo2(model_name)
+    # model = Evo2(model_name)  test
 
     ref_seq, alt_seq = build_sequences_api(
         chrom, pos, ref, alt
