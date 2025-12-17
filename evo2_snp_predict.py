@@ -111,7 +111,7 @@ def score_snp_hg38_api(
 if __name__ == "__main__":
 
     # ======= MODIFY HERE =======
-    chrom = "chr1"
+    chrom = "chr2"
     pos = 155827701      # hg38
     ref = "A"
     alt = "C"
